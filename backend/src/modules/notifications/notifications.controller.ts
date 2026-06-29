@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -27,7 +28,7 @@ export class NotificationsController {
     const personnel = await this.prisma.personnel.findUnique({
       where: { userId },
     });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return personnel;
   }
 

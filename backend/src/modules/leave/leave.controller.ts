@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { LeaveService } from './leave.service';
 import { ApproveLeaveDto, CreateLeaveRequestDto } from './leave.dto';
@@ -20,14 +20,14 @@ export class LeaveController {
   @ApiOperation({ summary: 'Yeni izin talebi oluştur (Belge: FR-03)' })
   async create(@CurrentUser('userId') userId: string, @Body() dto: CreateLeaveRequestDto) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.createRequest(personnel.id, dto);
   }
 
   @Get('requests/me')
   async myRequests(@CurrentUser('userId') userId: string) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.myRequests(personnel.id);
   }
 
@@ -36,7 +36,7 @@ export class LeaveController {
   @ApiOperation({ summary: 'Onay bekleyen talepler (Belge: FR-04)' })
   async pending(@CurrentUser('userId') userId: string) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.pendingForManager(personnel.id);
   }
 
@@ -49,14 +49,14 @@ export class LeaveController {
     @Body() dto: ApproveLeaveDto,
   ) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.approve(id, personnel.id, dto, role);
   }
 
   @Delete('requests/:id')
   async cancel(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.cancel(id, personnel.id);
   }
 
@@ -68,7 +68,7 @@ export class LeaveController {
     @Param('id') id: string,
   ) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.remove(id, personnel.id, role);
   }
 
@@ -78,7 +78,7 @@ export class LeaveController {
     @Query('year') year?: string,
   ) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.myBalance(personnel.id, year ? +year : undefined);
   }
 
@@ -92,7 +92,7 @@ export class LeaveController {
     @Query('year') year?: string,
   ) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.leaveList(personnel.id, role, {
       status,
       year: year ? +year : undefined,

@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -36,7 +37,7 @@ export class LeaveCategoryController {
   @ApiOperation({ summary: 'Bana açık izin kategorileri' })
   async forMe(@CurrentUser('userId') userId: string) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.leaveService.availableCategories(personnel.id);
   }
 

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -32,6 +33,17 @@ export class PayrollController {
     private readonly service: PayrollService,
     private readonly prisma: PrismaService,
   ) {}
+
+  /** Çağıranın Personnel kaydını getirir; yoksa anlamlı bir hata fırlatır (500 değil). */
+  private async requirePersonnel(userId: string) {
+    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
+    if (!personnel) {
+      throw new ForbiddenException(
+        'Bu işlemi yapabilmek için bir personel kaydınız olmalı',
+      );
+    }
+    return personnel;
+  }
 
   // === Maaş Konfigürasyonu ===
   @Post('salary/:personnelId')
@@ -68,8 +80,7 @@ export class PayrollController {
 
   @Get('me')
   async myPayrolls(@CurrentUser('userId') userId: string) {
-    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    const personnel = await this.requirePersonnel(userId);
     return this.service.myPayrolls(personnel.id);
   }
 
@@ -109,15 +120,13 @@ export class PayrollController {
     @CurrentUser('userId') userId: string,
     @Body() dto: CreateExpenseDto,
   ) {
-    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    const personnel = await this.requirePersonnel(userId);
     return this.service.createExpense(personnel.id, dto);
   }
 
   @Get('expenses/me')
   async myExpenses(@CurrentUser('userId') userId: string) {
-    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    const personnel = await this.requirePersonnel(userId);
     return this.service.myExpenses(personnel.id);
   }
 
@@ -141,15 +150,15 @@ export class PayrollController {
     @Param('id') id: string,
     @Body() dto: ApproveExpenseDto,
   ) {
-    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    return this.service.approveExpense(id, personnel?.id || userId, dto);
+    const personnel = await this.requirePersonnel(userId);
+    return this.service.approveExpense(id, personnel.id, dto);
   }
 
   @Patch('expenses/:id/pay')
   @Roles(Role.ACCOUNTING, Role.ADMIN)
   @ApiOperation({ summary: 'Muhasebe: onaylanmış talebi öder' })
   async payExpense(@Param('id') id: string, @CurrentUser('userId') userId: string) {
-    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    return this.service.payExpense(id, personnel?.id || userId);
+    const personnel = await this.requirePersonnel(userId);
+    return this.service.payExpense(id, personnel.id);
   }
 }

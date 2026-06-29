@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 import { CheckInDto, CheckOutDto } from './attendance.dto';
@@ -28,14 +28,14 @@ export class AttendanceController {
   @ApiOperation({ summary: 'Giriş yap (QR/Kart/Remote)' })
   async checkIn(@CurrentUser('userId') userId: string, @Body() dto: CheckInDto) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.checkIn(personnel.id, dto);
   }
 
   @Post('check-out')
   async checkOut(@CurrentUser('userId') userId: string, @Body() dto: CheckOutDto) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.checkOut(personnel.id, dto);
   }
 
@@ -46,7 +46,7 @@ export class AttendanceController {
     @Query('endDate') endDate?: string,
   ) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
-    if (!personnel) throw new Error('Personel kaydı bulunamadı');
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.myAttendance(personnel.id, startDate, endDate);
   }
 

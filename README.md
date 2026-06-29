@@ -106,6 +106,22 @@ Gmail ile aktif etmek için:
 `SMTP_PASS` alanına normal Gmail şifresi **çalışmaz**; yalnızca uygulama şifresi
 kullanılabilir. Bu değerleri `.env` dosyasında tutun, repoya commit etmeyin.
 
+## Push Bildirimleri (Firebase)
+
+Uygulama kapalıyken bile bildirim göndermek için Firebase Cloud Messaging (FCM)
+kullanılır. Aşağıdaki dosyalar **gizli sır içerdiği için repoya dahil değildir**
+(`.gitignore`); olmadıklarında backend ve mobil normal çalışır, sadece push
+bildirimleri pasif kalır (hata vermez).
+
+- `backend/firebase-service-account.json` — Firebase Console →
+  Proje Ayarları → Hizmet Hesapları → "Yeni özel anahtar oluştur" ile indirilir.
+- `ikys_mobile/android/app/google-services.json` — Firebase Console →
+  Proje Ayarları → Android uygulaması → `google-services.json` indir.
+
+Her iki dosya da aynı Firebase projesine ait olmalı. Ekip arkadaşına/yeni bir
+makineye geçerken bu dosyaları Firebase Console üzerinden (veya güvenli bir
+kanaldan) elle aktarman gerekir.
+
 ## Test ve Lint
 
 ```bash

@@ -50,6 +50,12 @@ export default function PayrollPage() {
                   <span>SGK + Vergi:</span>
                   <span>-{((+p.sgkEmployee + +p.incomeTax + +p.stampTax)).toLocaleString('tr-TR')} ₺</span>
                 </div>
+                {+p.avansDeduction > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>Avans Kesintisi:</span>
+                    <span>-{(+p.avansDeduction).toLocaleString('tr-TR')} ₺</span>
+                  </div>
+                )}
               </div>
 
               <button

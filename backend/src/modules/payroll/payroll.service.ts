@@ -81,24 +81,49 @@ export class PayrollService {
       cumulativeTaxBase: +(cumulative._sum.grossSalary || 0),
     });
 
-    return this.prisma.payroll.create({
-      data: {
+    // Ödenmiş ama henüz hiçbir bordroya işlenmemiş avanslar: net maaştan düşülür
+    // (avans zaten nakit olarak verilmişti, aynı tutar tekrar ödenmemeli).
+    const unappliedAvans = await this.prisma.expense.findMany({
+      where: {
         personnelId: dto.personnelId,
-        year: dto.year,
-        month: dto.month,
-        grossSalary: calc.grossSalary,
-        agi: calc.agi,
-        mealAllowance: calc.mealAllowance,
-        transportAllowance: calc.transportAllowance,
-        overtimePay: calc.overtimePay,
-        bonus: calc.bonus,
-        sgkEmployee: calc.sgkEmployee,
-        unemploymentIns: calc.unemploymentIns,
-        incomeTax: calc.incomeTax,
-        stampTax: calc.stampTax,
-        bes: calc.bes,
-        netSalary: calc.netSalary,
+        status: ExpenseStatus.PAID,
+        appliedPayrollId: null,
+        category: { equals: 'avans', mode: 'insensitive' },
       },
+    });
+    const avansDeduction = unappliedAvans.reduce((s, e) => s + +e.amount, 0);
+    const netSalary = +(calc.netSalary - avansDeduction).toFixed(2);
+
+    return this.prisma.$transaction(async (tx) => {
+      const payroll = await tx.payroll.create({
+        data: {
+          personnelId: dto.personnelId,
+          year: dto.year,
+          month: dto.month,
+          grossSalary: calc.grossSalary,
+          agi: calc.agi,
+          mealAllowance: calc.mealAllowance,
+          transportAllowance: calc.transportAllowance,
+          overtimePay: calc.overtimePay,
+          bonus: calc.bonus,
+          sgkEmployee: calc.sgkEmployee,
+          unemploymentIns: calc.unemploymentIns,
+          incomeTax: calc.incomeTax,
+          stampTax: calc.stampTax,
+          bes: calc.bes,
+          avansDeduction,
+          netSalary,
+        },
+      });
+
+      if (unappliedAvans.length > 0) {
+        await tx.expense.updateMany({
+          where: { id: { in: unappliedAvans.map((e) => e.id) } },
+          data: { appliedPayrollId: payroll.id },
+        });
+      }
+
+      return payroll;
     });
   }
 
@@ -156,6 +181,9 @@ export class PayrollService {
       this.row(doc, 'Gelir Vergisi', payroll.incomeTax);
       this.row(doc, 'Damga Vergisi', payroll.stampTax);
       this.row(doc, 'BES', payroll.bes);
+      if (+payroll.avansDeduction > 0) {
+        this.row(doc, 'Avans Kesintisi', payroll.avansDeduction);
+      }
 
       doc.moveDown(1);
       doc.fontSize(13).fillColor('green').text(

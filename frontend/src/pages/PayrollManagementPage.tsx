@@ -24,8 +24,13 @@ export default function PayrollManagementPage() {
 
   const generate = useMutation({
     mutationFn: (data: any) => api.post('/payroll/generate', data),
-    onSuccess: () => {
-      toast.success('Bordro üretildi');
+    onSuccess: (res: any) => {
+      const avans = +res.avansDeduction;
+      toast.success(
+        avans > 0
+          ? `Bordro üretildi — ${avans.toLocaleString('tr-TR')} ₺ avans net maaştan düşüldü`
+          : 'Bordro üretildi',
+      );
       qc.invalidateQueries({ queryKey: ['payrolls-me'] });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
@@ -37,18 +42,22 @@ export default function PayrollManagementPage() {
       toast.error('Maaş tanımı olan personel yok');
       return;
     }
-    let success = 0, skipped = 0;
+    let success = 0, skipped = 0, totalAvans = 0;
     for (const p of withSalary) {
       try {
-        await api.post('/payroll/generate', {
+        const res: any = await api.post('/payroll/generate', {
           personnelId: p.id, year, month, bonus: +bonusInputs[p.id] || 0,
         });
         success++;
+        totalAvans += +res.avansDeduction;
       } catch (e: any) {
         if (e.response?.data?.message?.includes('zaten mevcut')) skipped++;
       }
     }
-    toast.success(`${success} bordro üretildi${skipped > 0 ? `, ${skipped} atlandı (zaten mevcut)` : ''}`);
+    toast.success(
+      `${success} bordro üretildi${skipped > 0 ? `, ${skipped} atlandı (zaten mevcut)` : ''}`
+      + (totalAvans > 0 ? ` — toplam ${totalAvans.toLocaleString('tr-TR')} ₺ avans düşüldü` : ''),
+    );
     qc.invalidateQueries({ queryKey: ['payrolls-me'] });
   };
 

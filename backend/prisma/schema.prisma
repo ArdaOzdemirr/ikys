@@ -241,6 +241,7 @@ model Personnel {
   payrolls          Payroll[]
   expenses          Expense[]         @relation("ExpenseOwner")
   approvedExpenses  Expense[]         @relation("ExpenseApprover")
+  paidExpenses      Expense[]         @relation("ExpensePaidBy")
   salaryConfig      SalaryConfig?
   shifts            ShiftAssignment[]
   createdCategories LeaveCategory[]       @relation("CategoryCreator")
@@ -561,6 +562,7 @@ model Expense {
   status          ExpenseStatus @default(PENDING)
   approverId      String?
   approvedAt      DateTime?
+  paidById        String?
   paidAt          DateTime?
   rejectionReason String?
 
@@ -572,6 +574,7 @@ model Expense {
 
   personnel       Personnel  @relation("ExpenseOwner", fields: [personnelId], references: [id])
   approver        Personnel? @relation("ExpenseApprover", fields: [approverId], references: [id])
+  paidBy          Personnel? @relation("ExpensePaidBy", fields: [paidById], references: [id])
   appliedToPayroll Payroll?  @relation(fields: [appliedPayrollId], references: [id])
 }
 

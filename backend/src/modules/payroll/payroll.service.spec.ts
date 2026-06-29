@@ -100,3 +100,49 @@ describe('PayrollService.generatePayroll - avans entegrasyonu', () => {
     expect(where.category).toEqual({ equals: 'avans', mode: 'insensitive' });
   });
 });
+
+describe('PayrollService.payExpense', () => {
+  function buildService(expense: any) {
+    let updateArgs: any;
+    const prisma = {
+      expense: {
+        findUnique: jest.fn().mockResolvedValue(expense),
+        update: jest.fn((args: any) => {
+          updateArgs = args;
+          return { ...expense, ...args.data };
+        }),
+      },
+    };
+    const notifications = { create: jest.fn() };
+    const service = new PayrollService(prisma as any, new PayrollCalculator(), notifications as any);
+    return { service, getUpdateArgs: () => updateArgs };
+  }
+
+  it('ödeyen kişinin id\'sini paidById olarak kaydeder', async () => {
+    const { service, getUpdateArgs } = buildService({
+      id: 'exp1',
+      personnelId: 'p1',
+      status: ExpenseStatus.APPROVED,
+      amount: 1000,
+      currency: 'TRY',
+    });
+
+    await service.payExpense('exp1', 'accounting-personnel-1');
+
+    const args = getUpdateArgs();
+    expect(args.data.paidById).toBe('accounting-personnel-1');
+    expect(args.data.status).toBe(ExpenseStatus.PAID);
+  });
+
+  it('onaylanmamış talep ödenmeye çalışılırsa hata fırlatır', async () => {
+    const { service } = buildService({
+      id: 'exp1',
+      personnelId: 'p1',
+      status: ExpenseStatus.PENDING,
+      amount: 1000,
+      currency: 'TRY',
+    });
+
+    await expect(service.payExpense('exp1', 'accounting-personnel-1')).rejects.toThrow();
+  });
+});

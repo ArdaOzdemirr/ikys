@@ -242,6 +242,18 @@ class _ExpensesScreenState extends State<ExpensesScreen>
               ),
             ],
           ),
+          if (e.appliedPayrollId != null) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E8FF),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text('Bordroya yansıtıldı',
+                  style: TextStyle(color: Color(0xFF7E22CE), fontSize: 11, fontWeight: FontWeight.w600)),
+            ),
+          ],
           if (e.receiptUrl != null) ...[
             const SizedBox(height: 6),
             InkWell(

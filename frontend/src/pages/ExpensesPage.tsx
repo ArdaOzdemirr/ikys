@@ -147,7 +147,14 @@ export default function ExpensesPage() {
                     </button>
                   ) : '—'}
                 </td>
-                <td className="px-4 py-3"><ExpenseBadge status={e.status} /></td>
+                <td className="px-4 py-3">
+                  <ExpenseBadge status={e.status} />
+                  {e.appliedPayrollId && (
+                    <span className="badge bg-purple-100 text-purple-700 mt-1 block w-fit">
+                      Bordroya yansıtıldı
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

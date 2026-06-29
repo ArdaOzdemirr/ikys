@@ -455,6 +455,7 @@ class ExpenseItem {
   final String status; // PENDING | APPROVED | REJECTED | PAID
   final String? personnelName;
   final String? receiptUrl;
+  final String? appliedPayrollId;
 
   ExpenseItem({
     required this.id,
@@ -466,6 +467,7 @@ class ExpenseItem {
     required this.status,
     this.personnelName,
     this.receiptUrl,
+    this.appliedPayrollId,
   });
 
   factory ExpenseItem.fromJson(Map<String, dynamic> j) {
@@ -480,6 +482,7 @@ class ExpenseItem {
       status: j['status'] ?? 'PENDING',
       personnelName: p != null ? '${p['firstName']} ${p['lastName']}' : null,
       receiptUrl: j['receiptUrl'],
+      appliedPayrollId: j['appliedPayrollId'],
     );
   }
 }

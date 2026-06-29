@@ -22,7 +22,7 @@ Future<void> main() async {
   } catch (_) {
     // Firebase yapılandırması yoksa uygulama yine de açılsın
   }
-  ApiClient.instance.init();
+  await ApiClient.instance.init();
   await LocalNotifications.init();
   await PushService.init();
   runApp(const IkysApp());

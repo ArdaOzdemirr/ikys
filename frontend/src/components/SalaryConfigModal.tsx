@@ -129,7 +129,17 @@ export default function SalaryConfigModal({ open, onClose, personnelId, personne
   );
 }
 
-function NumField({ label, value, onChange, required }: any) {
+function NumField({
+  label,
+  value,
+  onChange,
+  required,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  required?: boolean;
+}) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>

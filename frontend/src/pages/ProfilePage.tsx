@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { User, Lock, ShieldCheck, ShieldOff, KeyRound } from 'lucide-react';
+import { ShieldCheck, ShieldOff, KeyRound } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();

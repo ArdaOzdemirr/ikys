@@ -42,7 +42,7 @@ export class MailerService {
           ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
           : undefined,
       });
-    } catch (e: any) {
+    } catch {
       this.logger.warn('nodemailer yüklü değil (npm i nodemailer); e-posta atlanıyor.');
       this.transporter = null;
     }

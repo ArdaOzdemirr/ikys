@@ -629,7 +629,7 @@ export class LeaveService {
         const override = c.accesses[0];
         return override ? override.visible : c.defaultVisible;
       })
-      .map(({ accesses, ...rest }) => rest);
+      .map(({ accesses: _accesses, ...rest }) => rest);
   }
 
   // ============= TATİLLER =============

@@ -1,11 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../services/api';
-import { Clock, MapPin, LogIn, LogOut } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export default function AttendancePage() {
-  const qc = useQueryClient();
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -24,41 +22,6 @@ export default function AttendancePage() {
     const todayUtc = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
     return recordDate === todayUtc;
 });
-
-  const checkIn = useMutation({
-    mutationFn: () => {
-      return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            api.post('/attendance/check-in', {
-              method: 'REMOTE',
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-            }).then(resolve).catch(reject);
-          },
-          () => {
-            // Konum verilmedi - yine de gönder
-            api.post('/attendance/check-in', { method: 'REMOTE' })
-              .then(resolve).catch(reject);
-          },
-        );
-      });
-    },
-    onSuccess: () => {
-      toast.success('Giriş yapıldı');
-      qc.invalidateQueries({ queryKey: ['attendance-me'] });
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
-  });
-
-  const checkOut = useMutation({
-    mutationFn: () => api.post('/attendance/check-out', {}),
-    onSuccess: () => {
-      toast.success('Çıkış yapıldı');
-      qc.invalidateQueries({ queryKey: ['attendance-me'] });
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
-  });
 
   return (
     <div className="p-8 space-y-6">

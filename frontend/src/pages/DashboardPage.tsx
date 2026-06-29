@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Calendar, Wallet, Briefcase, Clock, TrendingUp } from 'lucide-react';
+import { Users, Calendar, Clock, TrendingUp } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,

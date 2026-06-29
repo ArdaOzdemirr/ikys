@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../config/prisma.service';
 import { AttendanceMethod } from '@prisma/client';
 import { v4 as uuid } from 'uuid';

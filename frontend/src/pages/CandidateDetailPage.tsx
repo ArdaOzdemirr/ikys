@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import {
-  Mail, Phone, Calendar, Briefcase, FileText, MessageSquare,
+  Mail, Phone, Briefcase, FileText, MessageSquare,
   UserCheck, Star, ArrowLeft, Plus,
 } from 'lucide-react';
 

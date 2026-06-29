@@ -1,5 +1,7 @@
 # IKYS — İnsan Kaynakları Yönetim Sistemi
 
+[![CI](https://github.com/ArdaOzdemirr/ikys/actions/workflows/ci.yml/badge.svg)](https://github.com/ArdaOzdemirr/ikys/actions/workflows/ci.yml)
+
 Şirket içi İK süreçlerini (personel, izin, bordro, devam/QR check-in, işe alım, KVKK
 loglama, bildirimler) tek bir platformda toplayan; backend, web paneli ve mobil
 uygulamadan oluşan bir sistem.
@@ -104,8 +106,20 @@ Gmail ile aktif etmek için:
 `SMTP_PASS` alanına normal Gmail şifresi **çalışmaz**; yalnızca uygulama şifresi
 kullanılabilir. Bu değerleri `.env` dosyasında tutun, repoya commit etmeyin.
 
-## Test
+## Test ve Lint
+
 ```bash
-cd backend && npm run test
-cd frontend && npm run lint
+# Backend
+cd backend && npx tsc --noEmit && npm run lint && npm run test
+
+# Frontend
+cd frontend && npx tsc --noEmit && npm run lint && npm run test && npm run build
+
+# Mobil
+cd ikys_mobile && flutter analyze && flutter test
 ```
+
+## CI
+
+`main` branch'ine her push/PR'da [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+otomatik olarak backend/frontend/mobil için tip kontrolü, lint ve testleri çalıştırır.

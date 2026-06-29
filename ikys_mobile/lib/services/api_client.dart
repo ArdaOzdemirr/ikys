@@ -16,9 +16,10 @@ class ApiClient {
   late final Dio dio;
   void Function()? onForceLogout;
 
-  void init() {
+  Future<void> init() async {
+    final override = await TokenStorage.instance.getApiBaseUrlOverride();
     dio = Dio(BaseOptions(
-      baseUrl: apiBaseUrl,
+      baseUrl: override ?? apiBaseUrl,
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
     ));
@@ -83,6 +84,39 @@ class ApiClient {
     final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(res.data!);
     await OpenFilex.open(file.path);
+  }
+
+  String get currentBaseUrl => dio.options.baseUrl;
+
+  /// Sunucu ayarları ekranından çağrılır: yeni adresi kalıcı saklar ve
+  /// uygulamayı yeniden başlatmaya gerek kalmadan hemen etkin eder.
+  Future<void> setBaseUrl(String url) async {
+    await TokenStorage.instance.setApiBaseUrlOverride(url);
+    dio.options.baseUrl = url;
+  }
+
+  /// Varsayılana (config.dart) döner.
+  Future<void> resetBaseUrl() async {
+    await TokenStorage.instance.clearApiBaseUrlOverride();
+    dio.options.baseUrl = apiBaseUrl;
+  }
+
+  /// Verilen adresin gerçekten erişilebilir olup olmadığını hızlıca kontrol eder.
+  /// Sunucu adresi yanlışsa kullanıcı kaydetmeden önce uyarılabilsin diye.
+  static Future<bool> testConnection(String url) async {
+    try {
+      final probe = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
+      ));
+      // Herhangi bir yanıt (404 dahil) sunucunun erişilebilir olduğunu gösterir.
+      await probe.get(url);
+      return true;
+    } on DioException catch (e) {
+      return e.response != null;
+    } catch (_) {
+      return false;
+    }
   }
 
   static String errorMessage(Object e, [String fallback = 'Bir hata oluştu']) {

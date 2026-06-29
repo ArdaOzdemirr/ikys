@@ -39,7 +39,9 @@ export class PushService {
         return null;
       }
       const moduleName = 'firebase-admin';
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // Modül adını değişkene alıp require ediyoruz: paket kurulu değilse TS derlemede
+      // modül çözümlemesi yapmaz, yalnızca runtime'da hata fırlatır (yukarıda yakalanır).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const admin = require(moduleName);
       const serviceAccount = JSON.parse(fs.readFileSync(credPath, 'utf8'));
       if (!admin.apps.length) {

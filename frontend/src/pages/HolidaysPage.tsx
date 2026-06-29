@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
-import { Calendar, Plus, Trash2, Repeat } from 'lucide-react';
+import { Calendar, Plus, Repeat } from 'lucide-react';
 
 export default function HolidaysPage() {
   const qc = useQueryClient();

@@ -13,6 +13,7 @@ class TokenStorage {
   static const _kAccess = 'accessToken';
   static const _kRefresh = 'refreshToken';
   static const _kUser = 'user';
+  static const _kApiBaseUrl = 'apiBaseUrlOverride';
 
   Future<String?> getAccess() => _s.read(key: _kAccess);
   Future<String?> getRefresh() => _s.read(key: _kRefresh);
@@ -40,4 +41,13 @@ class TokenStorage {
     await _s.delete(key: _kRefresh);
     await _s.delete(key: _kUser);
   }
+
+  /// Kullanıcının ayarlar ekranından girdiği sunucu adresi (varsa).
+  /// Yoksa config.dart'taki derleme zamanı varsayılanı kullanılır.
+  Future<String?> getApiBaseUrlOverride() => _s.read(key: _kApiBaseUrl);
+
+  Future<void> setApiBaseUrlOverride(String url) =>
+      _s.write(key: _kApiBaseUrl, value: url);
+
+  Future<void> clearApiBaseUrlOverride() => _s.delete(key: _kApiBaseUrl);
 }

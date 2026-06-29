@@ -263,7 +263,7 @@ export default function PersonnelFormModal({ open, onClose }: Props) {
   );
 }
 
-function Field({ label, required, children }: any) {
+function Field({ label, required: _required, children }: any) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">

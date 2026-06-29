@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
@@ -40,7 +40,6 @@ const navItems: NavItem[] = [
 
 export default function Layout() {
   const { user, logout, hasRole } = useAuth();
-  const navigate = useNavigate();
 
   const { data: unread } = useQuery<{ count: number }>({
     queryKey: ['notif-unread'],

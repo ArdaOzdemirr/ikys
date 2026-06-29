@@ -273,7 +273,7 @@ export class PayrollService {
   }
 
   /** Muhasebe: onaylanmış talebi gerçekten ödeyince çağrılır. */
-  async payExpense(id: string, payerId: string) {
+  async payExpense(id: string, _payerId: string) {
     const expense = await this.prisma.expense.findUnique({ where: { id } });
     if (!expense) throw new NotFoundException('Masraf/para talebi bulunamadı');
     if (expense.status !== ExpenseStatus.APPROVED) {

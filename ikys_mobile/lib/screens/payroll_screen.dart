@@ -110,6 +110,7 @@ class _PayrollDetail extends StatelessWidget {
           _row('Gelir Vergisi', p.incomeTax, negative: true),
           _row('Damga Vergisi', p.stampTax, negative: true),
           if (p.bes > 0) _row('BES', p.bes, negative: true),
+          if (p.avansDeduction > 0) _row('Avans Kesintisi', p.avansDeduction, negative: true),
           if (p.otherDeductions > 0) _row('Diğer', p.otherDeductions, negative: true),
           _row('Toplam Kesinti', p.totalDeductions, negative: true, bold: true),
           const Divider(height: 24),

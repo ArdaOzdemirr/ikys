@@ -501,6 +501,7 @@ class PayrollRecord {
   final double stampTax;
   final double bes;
   final double otherDeductions;
+  final double avansDeduction;
   final double netSalary;
 
   PayrollRecord({
@@ -519,11 +520,12 @@ class PayrollRecord {
     required this.stampTax,
     required this.bes,
     required this.otherDeductions,
+    required this.avansDeduction,
     required this.netSalary,
   });
 
   double get totalDeductions =>
-      sgkEmployee + unemploymentIns + incomeTax + stampTax + bes + otherDeductions;
+      sgkEmployee + unemploymentIns + incomeTax + stampTax + bes + otherDeductions + avansDeduction;
 
   factory PayrollRecord.fromJson(Map<String, dynamic> j) => PayrollRecord(
         id: j['id'],
@@ -541,6 +543,7 @@ class PayrollRecord {
         stampTax: _toD(j['stampTax']),
         bes: _toD(j['bes']),
         otherDeductions: _toD(j['otherDeductions']),
+        avansDeduction: _toD(j['avansDeduction']),
         netSalary: _toD(j['netSalary']),
       );
 }

@@ -11,6 +11,12 @@ import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class PayrollService {
   private readonly receiptDir = path.join(process.cwd(), 'uploads', 'receipts');
+  // require.resolve(paket adı) "main" alanı olmayan paketlerde başarısız olur;
+  // package.json'ı resolve ederek paketin kurulu olduğu dizini güvenilir buluyoruz.
+  private readonly fontsDir = path.join(
+    path.dirname(require.resolve('dejavu-fonts-ttf/package.json')),
+    'ttf',
+  );
 
   constructor(
     private prisma: PrismaService,
@@ -147,6 +153,12 @@ export class PayrollService {
       doc.on('data', (c) => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
+
+      // PDFKit'in varsayılan Helvetica fontu Türkçe karakterleri (Ş, İ, ı, ğ, vb.)
+      // desteklemiyor; Latin Extended-A kapsayan DejaVu Sans'a geçiyoruz.
+      doc.registerFont('DejaVu', path.join(this.fontsDir, 'DejaVuSans.ttf'));
+      doc.registerFont('DejaVu-Bold', path.join(this.fontsDir, 'DejaVuSans-Bold.ttf'));
+      doc.font('DejaVu');
 
       // Başlık
       doc.fontSize(18).text('MAAŞ BORDROSU', { align: 'center' });

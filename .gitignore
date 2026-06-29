@@ -1,0 +1,31 @@
+# Bağımlılıklar
+node_modules/
+
+# Derleme çıktıları
+dist/
+build/
+*.tsbuildinfo
+
+# Ortam değişkenleri / sırlar
+.env
+.env.local
+.env.*.local
+backend/firebase-service-account.json
+ikys_mobile/android/app/google-services.json
+
+# Kullanıcı yüklemeleri (çalışma zamanında oluşur, repoya girmemeli)
+backend/uploads/
+
+# Loglar
+*.log
+npm-debug.log*
+
+# Editör / İS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+.claude/settings.local.json
+
+# Test/coverage
+coverage/

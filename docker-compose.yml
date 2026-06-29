@@ -1,0 +1,47 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ikys-postgres
+    environment:
+      POSTGRES_USER: ikys_user
+      POSTGRES_PASSWORD: ikys_pass
+      POSTGRES_DB: ikys_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ikys_user -d ikys_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: ikys-backend
+    environment:
+      DATABASE_URL: postgresql://ikys_user:ikys_pass@postgres:5432/ikys_db?schema=public
+      NODE_ENV: production
+      PORT: 3000
+      JWT_SECRET: change-this-in-production-min-64-characters-long-random-string
+      JWT_REFRESH_SECRET: another-change-this-in-production-min-64-characters-long-string
+      FRONTEND_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && node dist/main.js"
+
+  frontend:
+    build: ./frontend
+    container_name: ikys-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  pg_data:

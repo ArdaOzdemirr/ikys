@@ -1,0 +1,659 @@
+// İKYS - İnsan Kaynakları Yönetim Sistemi
+// Prisma Schema - PostgreSQL
+// CMMI uyumlu, KVKK destekli model
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  EMPLOYEE // Personel
+  MANAGER // Yönetici
+  HR // İK Yetkilisi
+  ACCOUNTING // Muhasebe
+  ADMIN // Sistem Yöneticisi
+}
+
+enum PersonnelStatus {
+  ACTIVE // Aktif
+  RESIGNED // İşten Ayrıldı
+  SUSPENDED // Askıda
+}
+
+enum ContractType {
+  PERMANENT // Belirsiz Süreli
+  TEMPORARY // Belirli Süreli
+  PARTTIME // Yarı Zamanlı
+  INTERN // Stajyer
+  CONSULTANT // Danışman
+}
+
+enum AttendanceMethod {
+  QR_CODE
+  CARD
+  REMOTE
+  MANUAL
+}
+
+enum LeaveType {
+  ANNUAL // Yıllık izin
+  HALF_DAY // Yarım gün
+  HOURLY // Saatlik
+  EXCUSE // Mazeret
+  SICK // Sağlık raporu
+  MATERNITY // Doğum izni
+  PATERNITY // Babalık izni
+  MARRIAGE // Evlilik izni
+  BEREAVEMENT // Vefat izni
+  UNPAID // Ücretsiz izin
+}
+
+enum LeaveStatus {
+  PENDING // Beklemede
+  APPROVED // Onaylandı
+  REJECTED // Reddedildi
+  CANCELLED // İptal edildi
+}
+
+enum PaymentType {
+  PAID // Ücretli
+  UNPAID // Ücretsiz
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum CandidateStatus {
+  APPLIED // Başvurdu
+  SCREENING // Ön eleme
+  INTERVIEW // Mülakat
+  OFFER // Teklif
+  HIRED // İşe alındı
+  REJECTED // Reddedildi
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+}
+
+// Bildirim türleri (web + mobil ortak)
+enum NotificationType {
+  LEAVE_APPROVAL_PENDING // Onayına sunulan izin talebi var
+  LEAVE_APPROVED // İzin talebi onaylandı (çalışana)
+  LEAVE_REJECTED // İzin talebi reddedildi (çalışana)
+  MESSAGE // Kişiden kişiye serbest mesaj
+  EXPENSE_PENDING // Onaya sunulan masraf/para talebi var (muhasebe/admin'e)
+  EXPENSE_APPROVED // Masraf/para talebi onaylandı (çalışana)
+  EXPENSE_REJECTED // Masraf/para talebi reddedildi (çalışana)
+  EXPENSE_PAID // Masraf/para talebi ödendi (çalışana)
+}
+
+// İzin onay zincirindeki tek bir adımın durumu
+enum ApprovalStepStatus {
+  PENDING // Bu kişinin onayı bekleniyor
+  APPROVED // Bu kişi onayladı
+  REJECTED // Bu kişi reddetti
+  SKIPPED // Zincir önceden bittiği için atlandı
+}
+
+// Bildirim/mesaj önem seviyesi
+enum NotificationPriority {
+  NORMAL
+  IMPORTANT // Önemli
+  URGENT // Çok önemli (telefonda farklı ses + kırmızı heads-up)
+}
+
+// ============================================================
+// ŞİRKET YAPISI (Belge: Personel Yönetimi - şısı)
+// ============================================================
+
+model Branch {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  city      String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  departments Department[]
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String
+  code      String?  @unique
+  branchId  String
+  parentId  String? // Hiyerarşi için
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branch    Branch       @relation(fields: [branchId], references: [id])
+  parent    Department?  @relation("DeptHierarchy", fields: [parentId], references: [id])
+  children  Department[] @relation("DeptHierarchy")
+  positions Position[]
+  personnel Personnel[]
+}
+
+model Position {
+  id           String   @id @default(uuid())
+  title        String
+  departmentId String
+  level        Int      @default(1)
+  description  String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  department Department  @relation(fields: [departmentId], references: [id])
+  personnel  Personnel[]
+}
+
+// ============================================================
+// KULLANICI VE PERSONEL (Belge: FR-01, FR-02)
+// ============================================================
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  passwordHash     String
+  role             Role      @default(EMPLOYEE)
+  isActive         Boolean   @default(true)
+  twoFactorSecret  String? // 2FA için (Belge: Güvenli Giriş)
+  twoFactorEnabled Boolean   @default(false)
+  lastLoginAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  personnel     Personnel?
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Personnel {
+  id               String    @id @default(uuid())
+  employeeNo       String    @unique // Personel sicil no
+  userId           String    @unique
+  firstName        String
+  lastName         String
+  tcKimlikNo       String    @unique // TCKN (KVKK - hassas veri)
+  birthDate        DateTime?
+  phone            String?
+  address          String?
+  emergencyContact String?
+
+  departmentId String?
+  positionId   String?
+  managerId    String? // Yöneticisi
+
+  status        PersonnelStatus @default(ACTIVE)
+  contractType  ContractType    @default(PERMANENT)
+  hireDate      DateTime // İşe giriş tarihi (kıdem hesabı için)
+  contractStart DateTime?
+  contractEnd   DateTime?
+  resignDate    DateTime?
+  resignReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User        @relation(fields: [userId], references: [id])
+  department   Department? @relation(fields: [departmentId], references: [id])
+  position     Position?   @relation(fields: [positionId], references: [id])
+  manager      Personnel?  @relation("ManagerHierarchy", fields: [managerId], references: [id])
+  subordinates Personnel[] @relation("ManagerHierarchy")
+
+  documents         Document[]
+  attendances       Attendance[]
+  leaveBalances     LeaveBalance[]
+  leaveRequests     LeaveRequest[]    @relation("Requester")
+  approvedLeaves    LeaveRequest[]    @relation("Approver")
+  payrolls          Payroll[]
+  expenses          Expense[]         @relation("ExpenseOwner")
+  approvedExpenses  Expense[]         @relation("ExpenseApprover")
+  salaryConfig      SalaryConfig?
+  shifts            ShiftAssignment[]
+  createdCategories LeaveCategory[]       @relation("CategoryCreator")
+  categoryAccesses  LeaveCategoryAccess[] @relation("CategoryAccess")
+
+  // Bildirimler ve izin onay zinciri
+  notificationsReceived Notification[]      @relation("NotificationRecipient")
+  notificationsSent     Notification[]      @relation("NotificationSender")
+  approvalSteps         LeaveApprovalStep[] @relation("ApprovalStepApprover")
+  deviceTokens          DeviceToken[]
+}
+
+// ============================================================
+// DİJİTAL ARŞİV (Belge: Personel Yönetimi - Dijital Arşiv)
+// ============================================================
+
+model Document {
+  id          String   @id @default(uuid())
+  personnelId String
+  type        String // diploma, kimlik, ikametgah, sözleşme, vb.
+  fileName    String
+  fileUrl     String // Object Storage path
+  fileSize    Int
+  mimeType    String
+  uploadedAt  DateTime @default(now())
+  uploadedBy  String?
+
+  personnel Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// ÇALIŞ (Belge: Çalışma Saatleri Takibi)
+// ============================================================
+
+model Shift {
+  id        String  @id @default(uuid())
+  name      String // Sabah, Akşam, Gece vb.
+  startTime String // "08:00"
+  endTime   String // "17:00"
+  breakMin  Int     @default(60) // Mola dakika
+  isActive  Boolean @default(true)
+
+  assignments ShiftAssignment[]
+}
+
+model ShiftAssignment {
+  id          String    @id @default(uuid())
+  personnelId String
+  shiftId     String
+  startDate   DateTime
+  endDate     DateTime?
+
+  personnel Personnel @relation(fields: [personnelId], references: [id])
+  shift     Shift     @relation(fields: [shiftId], references: [id])
+}
+
+model Attendance {
+  id          String           @id @default(uuid())
+  personnelId String
+  date        DateTime         @db.Date
+  checkIn     DateTime?
+  checkOut    DateTime?
+  method      AttendanceMethod @default(QR_CODE)
+
+  // Lokasyon bazlı giriş için
+  checkInLat  Float?
+  checkInLng  Float?
+  checkOutLat Float?
+  checkOutLng Float?
+
+  // Hesaplamalar
+  workedMinutes Int? // Çalışılan toplam dakika
+  overtimeMin   Int     @default(0) // Fazla mesai dakika
+  isLate        Boolean @default(false)
+  notes         String?
+
+  createdAt DateTime @default(now())
+
+  personnel Personnel @relation(fields: [personnelId], references: [id])
+
+  @@unique([personnelId, date])
+  @@index([date])
+}
+
+model QrCode {
+  id         String   @id @default(uuid())
+  code       String   @unique // Dinamik QR (her N saniyede yenilenir)
+  branchId   String?
+  validUntil DateTime
+  createdAt  DateTime @default(now())
+}
+
+// ============================================================
+// İZİN YÖNETİMİ (Belge: FR-03, FR-04)
+// ============================================================
+
+model LeaveBalance {
+  id            String    @id @default(uuid())
+  personnelId   String
+  year          Int
+  type          LeaveType
+  totalDays     Float // Yıllık hak
+  usedDays      Float     @default(0) // Kullanılan
+  remainingDays Float // Kalan
+
+  personnel Personnel @relation(fields: [personnelId], references: [id])
+
+  @@unique([personnelId, year, type])
+}
+
+model LeaveRequest {
+  id          String       @id @default(uuid())
+  personnelId String
+  type        LeaveType? // Geriye dönük uyumluluk (artık opsiyonel)
+  categoryId  String? // Dinamik kategori
+  startDate   DateTime     @db.Date
+  endDate     DateTime     @db.Date
+  totalDays   Float
+  reason      String?
+  documentUrl String? // Sağlık raporu vb.
+
+  // İlk yıl izni: bakiye düşülmez, onaylayan ücretli/ücretsiz karar verir
+  paymentType             PaymentType?
+  requiresPaymentDecision Boolean      @default(false)
+
+  // Onaylanınca (ücretli ise) hangi yılın yıllık bakiyesinden düşüleceği.
+  // null = hiç bakiyeden düşme (ücretsiz, ilk yıl, ya da yıllık-dışı izin).
+  // Bakiyesi yetersiz kıdemli personelde gelecek yıl (startYear + 1) olur.
+  deductFromYear Int?
+
+  status          LeaveStatus @default(PENDING)
+  approverId      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+
+  // Hiyerarşik (sıralı) onay zinciri için: şu an kaçıncı adımda olduğumuz.
+  // 1 = ilk amir. Her onayda artar; zincir bitince izin onaylanır.
+  currentStepOrder Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  personnel Personnel      @relation("Requester", fields: [personnelId], references: [id])
+  approver  Personnel?     @relation("Approver", fields: [approverId], references: [id])
+  category  LeaveCategory? @relation(fields: [categoryId], references: [id])
+
+  approvalSteps LeaveApprovalStep[]
+
+  @@index([personnelId, status])
+  @@index([startDate, endDate])
+}
+
+// İzin talebinin sıralı onay zinciri (organizasyon şeması: en alttaki personelin
+// talebi amir amir yukarı çıkar; her amir kendi adımında onaylar/reddeder).
+model LeaveApprovalStep {
+  id         String             @id @default(uuid())
+  requestId  String
+  approverId String
+  stepOrder  Int // 1 = ilk amir, 2 = onun amiri ...
+  status     ApprovalStepStatus @default(PENDING)
+  note       String?
+  decidedAt  DateTime?
+  createdAt  DateTime           @default(now())
+
+  request  LeaveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  approver Personnel    @relation("ApprovalStepApprover", fields: [approverId], references: [id])
+
+  @@unique([requestId, stepOrder])
+  @@index([approverId, status])
+}
+
+// FCM push için cihaz token'ları (uygulama kapalıyken bildirim göndermek için)
+model DeviceToken {
+  id          String   @id @default(uuid())
+  personnelId String
+  token       String   @unique
+  platform    String? // android / ios
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  personnel Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+
+  @@index([personnelId])
+}
+
+// Genel bildirim / gelen kutusu kaydı (web + mobil ortak)
+model Notification {
+  id          String           @id @default(uuid())
+  recipientId String
+  senderId    String? // sistem bildirimlerinde boş olabilir
+  type        NotificationType
+  priority    NotificationPriority @default(NORMAL)
+  title       String
+  body        String?
+  refType     String? // "LeaveRequest" gibi; tıklanınca ilgili kayda gitmek için
+  refId       String?
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  recipient Personnel  @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender    Personnel? @relation("NotificationSender", fields: [senderId], references: [id])
+
+  @@index([recipientId, isRead])
+  @@index([recipientId, createdAt])
+}
+
+// HR/Admin tarafından yönetilen dinamik izin kategorileri
+model LeaveCategory {
+  id                   String   @id @default(uuid())
+  code                 String   @unique
+  name                 String
+  description          String?
+  isPaid               Boolean  @default(true)
+  affectsAnnualBalance Boolean  @default(false)
+  defaultVisible       Boolean  @default(true)
+  isActive             Boolean  @default(true)
+  isSystem             Boolean  @default(false)
+  createdById          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  createdBy Personnel?            @relation("CategoryCreator", fields: [createdById], references: [id])
+  accesses  LeaveCategoryAccess[]
+  requests  LeaveRequest[]
+}
+
+// Kategori görünürlüğünün kişiye özel istisnaları
+model LeaveCategoryAccess {
+  id          String   @id @default(uuid())
+  categoryId  String
+  personnelId String
+  visible     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  category  LeaveCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  personnel Personnel     @relation("CategoryAccess", fields: [personnelId], references: [id])
+
+  @@unique([categoryId, personnelId])
+}
+
+model Holiday {
+  id         String   @id @default(uuid())
+  name       String // "Cumhuriyet Bayramı"
+  date       DateTime @db.Date
+  isOfficial Boolean  @default(true) // Resmi tatil mi?
+  recurring  Boolean  @default(false) // Her yıl tekrar eder mi?
+
+  @@unique([name, date])
+}
+
+// ============================================================
+// BORDRO VE FİNANS (Belge: FR-05, Bordro ve Finansal Veriler)
+// ============================================================
+
+model SalaryConfig {
+  id                 String   @id @default(uuid())
+  personnelId        String   @unique
+  grossSalary        Decimal  @db.Decimal(12, 2) // Brüt maaş
+  netSalary          Decimal? @db.Decimal(12, 2) // Net (otomatik hesaplanabilir)
+  agi                Decimal  @default(0) @db.Decimal(10, 2) // Asgari Geçim İndirimi
+  mealAllowance      Decimal  @default(0) @db.Decimal(10, 2) // Yemek kartı
+  transportAllowance Decimal  @default(0) @db.Decimal(10, 2) // Yol yardımı
+  bes                Decimal  @default(0) @db.Decimal(10, 2) // Bireysel Emeklilik
+  effectiveFrom      DateTime @default(now())
+
+  personnel Personnel @relation(fields: [personnelId], references: [id])
+}
+
+model Payroll {
+  id          String @id @default(uuid())
+  personnelId String
+  year        Int
+  month       Int // 1-12
+
+  // Brüt + Yan Haklar
+  grossSalary        Decimal @db.Decimal(12, 2)
+  agi                Decimal @db.Decimal(10, 2)
+  mealAllowance      Decimal @db.Decimal(10, 2)
+  transportAllowance Decimal @db.Decimal(10, 2)
+  overtimePay        Decimal @default(0) @db.Decimal(10, 2)
+  bonus              Decimal @default(0) @db.Decimal(10, 2)
+
+  // Kesintiler (Belge: SGK işçi payı, gelir vergisi, damga vergisi, BES)
+  sgkEmployee     Decimal @db.Decimal(10, 2) // SGK işçi payı
+  unemploymentIns Decimal @db.Decimal(10, 2) // İşsizlik sigortası
+  incomeTax       Decimal @db.Decimal(10, 2) // Gelir vergisi
+  stampTax        Decimal @db.Decimal(10, 2) // Damga vergisi
+  bes             Decimal @default(0) @db.Decimal(10, 2)
+  otherDeductions Decimal @default(0) @db.Decimal(10, 2)
+
+  netSalary Decimal @db.Decimal(12, 2) // Net ödeme
+
+  pdfUrl      String? // Bordro PDF
+  generatedAt DateTime  @default(now())
+  paidAt      DateTime?
+
+  personnel Personnel @relation(fields: [personnelId], references: [id])
+
+  @@unique([personnelId, year, month])
+  @@index([year, month])
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  personnelId String
+  category    String // yemek, yol, iş, vb.
+  amount      Decimal  @db.Decimal(10, 2)
+  currency    String   @default("TRY")
+  date        DateTime @db.Date
+  description String
+  receiptUrl  String? // Fiş/fatura
+
+  status          ExpenseStatus @default(PENDING)
+  approverId      String?
+  approvedAt      DateTime?
+  paidAt          DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+
+  personnel Personnel  @relation("ExpenseOwner", fields: [personnelId], references: [id])
+  approver  Personnel? @relation("ExpenseApprover", fields: [approverId], references: [id])
+}
+
+// ============================================================
+// İŞe Alım Modülü)
+// ============================================================
+
+model JobPosting {
+  id           String    @id @default(uuid())
+  title        String
+  description  String    @db.Text
+  departmentId String?
+  requirements String?   @db.Text
+  location     String?
+  isActive     Boolean   @default(true)
+  publishedAt  DateTime  @default(now())
+  closedAt     DateTime?
+
+  candidates Candidate[]
+}
+
+model Candidate {
+  id          String  @id @default(uuid())
+  firstName   String
+  lastName    String
+  email       String
+  phone       String?
+  cvUrl       String? // CV yükleme
+  linkedinUrl String?
+
+  jobPostingId String?
+  status       CandidateStatus @default(APPLIED)
+  source       String? // LinkedIn, Kariyer.net, vb.
+
+  notes     InterviewNote[]
+  appliedAt DateTime        @default(now())
+  hiredAt   DateTime? // Aday → çalışan dönüşümü
+
+  jobPosting JobPosting? @relation(fields: [jobPostingId], references: [id])
+}
+
+model InterviewNote {
+  id          String   @id @default(uuid())
+  candidateId String
+  interviewer String
+  date        DateTime @default(now())
+  rating      Int? // 1-5
+  notes       String   @db.Text
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// KVKK & AUDIT LOG (Belge: KVKK & Loglama)
+// ============================================================
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  userId    String?
+  action    AuditAction
+  entity    String // Personnel, Payroll, vb.
+  entityId  String?
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId, timestamp])
+  @@index([entity, entityId])
+}
+
+model DataRetentionPolicy {
+  id             String   @id @default(uuid())
+  entity         String   @unique // "Personnel", "Payroll"
+  retentionDays  Int // Saklama süresi (gün)
+  anonymizeAfter Boolean  @default(true) // Süre sonunda anonimleştir
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model KvkkConsent {
+  id          String    @id @default(uuid())
+  personnelId String
+  consentType String // "data_processing", "marketing"
+  granted     Boolean
+  grantedAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  ipAddress   String?
+
+  @@index([personnelId])
+}

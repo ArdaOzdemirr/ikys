@@ -1,0 +1,240 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../services/api';
+import { useState } from 'react';
+import toast from 'react-hot-toast';
+import { Calendar, Plus } from 'lucide-react';
+
+const LEAVE_TYPES = [
+  { value: 'ANNUAL', label: 'Yıllık İzin' },
+  { value: 'HALF_DAY', label: 'Yarım Gün' },
+  { value: 'HOURLY', label: 'Saatlik' },
+  { value: 'EXCUSE', label: 'Mazeret' },
+  { value: 'SICK', label: 'Sağlık Raporu' },
+  { value: 'MATERNITY', label: 'Doğum İzni' },
+  { value: 'PATERNITY', label: 'Babalık İzni' },
+  { value: 'MARRIAGE', label: 'Evlilik İzni' },
+  { value: 'BEREAVEMENT', label: 'Vefat İzni' },
+  { value: 'UNPAID', label: 'Ücretsiz İzin' },
+];
+
+export default function LeavePage() {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    type: 'ANNUAL', startDate: '', endDate: '', reason: '',
+  });
+
+  const { data: balance } = useQuery({
+    queryKey: ['leave-balance'],
+    queryFn: () => api.get('/leave/balance/me'),
+  });
+
+  const { data: requests } = useQuery({
+    queryKey: ['leave-me'],
+    queryFn: () => api.get('/leave/requests/me'),
+  });
+
+  const create = useMutation({
+    mutationFn: (data: any) => api.post('/leave/requests', data),
+    onSuccess: () => {
+      toast.success('Talebiniz oluşturuldu, yönetici onayı bekleniyor');
+      qc.invalidateQueries({ queryKey: ['leave-me'] });
+      qc.invalidateQueries({ queryKey: ['leave-balance'] });
+      setShowForm(false);
+      setForm({ type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
+  });
+
+  const cancel = useMutation({
+    mutationFn: (id: string) => api.delete(`/leave/requests/${id}`),
+    onSuccess: () => {
+      toast.success('Talep iptal edildi');
+      qc.invalidateQueries({ queryKey: ['leave-me'] });
+      qc.invalidateQueries({ queryKey: ['leave-balance'] });
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.delete(`/leave/requests/${id}/remove`),
+    onSuccess: () => {
+      toast.success('Talep silindi');
+      qc.invalidateQueries({ queryKey: ['leave-me'] });
+      qc.invalidateQueries({ queryKey: ['leave-balance'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Silinemedi'),
+  });
+
+  return (
+    <div className="p-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">İzinlerim</h1>
+        <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
+          <Plus size={18} />
+          Yeni Talep
+        </button>
+      </div>
+
+      {/* Bakiye */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {balance?.map((b: any) => (
+          <div key={b.id} className="card">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="text-brand-600" size={18} />
+              <p className="text-sm text-gray-600">
+                {LEAVE_TYPES.find((t) => t.value === b.type)?.label || b.type} ({b.year})
+              </p>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{b.remainingDays}</p>
+            <p className="text-xs text-gray-500">
+              Toplam: {b.totalDays} · Kullanılan: {b.usedDays}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Form */}
+      {showForm && (
+        <form
+          onSubmit={(e) => { e.preventDefault(); create.mutate(form); }}
+          className="card space-y-4"
+        >
+          <h3 className="font-semibold">Yeni İzin Talebi</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">İzin Tipi</label>
+              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input">
+                {LEAVE_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Başlangıç</label>
+              <input
+                type="date"
+                required
+                value={form.startDate}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Bitiş</label>
+              <input
+                type="date"
+                required
+                value={form.endDate}
+                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                className="input"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-1">Açıklama</label>
+              <textarea
+                value={form.reason}
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                className="input"
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" disabled={create.isPending} className="btn-primary">
+              {create.isPending ? 'Gönderiliyor...' : 'Talep Gönder'}
+            </button>
+            <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">
+              İptal
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Geçmiş */}
+      <div className="card overflow-x-auto p-0">
+        <h3 className="font-semibold p-4 border-b border-gray-200">Talep Geçmişi</h3>
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr className="text-left text-xs text-gray-500 uppercase">
+              <th className="px-4 py-3">Tip</th>
+              <th className="px-4 py-3">Başlangıç</th>
+              <th className="px-4 py-3">Bitiş</th>
+              <th className="px-4 py-3">Gün</th>
+              <th className="px-4 py-3">Durum</th>
+              <th className="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {requests?.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Talep yok</td></tr>
+            ) : requests?.map((r: any) => (
+              <tr key={r.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm">
+                  {LEAVE_TYPES.find((t) => t.value === r.type)?.label || r.type}
+                </td>
+                <td className="px-4 py-3 text-sm">{new Date(r.startDate).toLocaleDateString('tr-TR')}</td>
+                <td className="px-4 py-3 text-sm">{new Date(r.endDate).toLocaleDateString('tr-TR')}</td>
+                <td className="px-4 py-3 text-sm font-medium">{r.totalDays}</td>
+                <td className="px-4 py-3">
+                  <LeaveStatusBadge status={r.status} />
+                  {r.status === 'PENDING' && r.approvalSteps?.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {(() => {
+                        const cur = r.approvalSteps.find(
+                          (s: any) => s.stepOrder === r.currentStepOrder,
+                        );
+                        const who = cur?.approver
+                          ? `${cur.approver.firstName} ${cur.approver.lastName}`
+                          : 'amir';
+                        return `Onayda: ${who} (${r.currentStepOrder}/${r.approvalSteps.length})`;
+                      })()}
+                    </p>
+                  )}
+                  {r.status === 'REJECTED' && r.rejectionReason && (
+                    <p className="text-xs text-red-500 mt-1">{r.rejectionReason}</p>
+                  )}
+                  {r.status === 'APPROVED' && r.paymentType && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {r.paymentType === 'PAID' ? 'Ücretli' : 'Ücretsiz'}
+                    </p>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex gap-3 items-center">
+                    {r.status === 'PENDING' && (
+                      <button
+                        onClick={() => cancel.mutate(r.id)}
+                        className="text-amber-600 hover:underline text-xs"
+                      >
+                        İptal
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (confirm('Bu izin kaydı kalıcı olarak silinsin mi?')) remove.mutate(r.id);
+                      }}
+                      className="text-red-600 hover:underline text-xs"
+                    >
+                      Sil
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function LeaveStatusBadge({ status }: { status: string }) {
+  const c: any = {
+    PENDING: { color: 'bg-yellow-100 text-yellow-800', label: 'Beklemede' },
+    APPROVED: { color: 'bg-green-100 text-green-800', label: 'Onaylandı' },
+    REJECTED: { color: 'bg-red-100 text-red-800', label: 'Reddedildi' },
+    CANCELLED: { color: 'bg-gray-100 text-gray-700', label: 'İptal' },
+  };
+  const x = c[status] || { color: 'bg-gray-100', label: status };
+  return <span className={`badge ${x.color}`}>{x.label}</span>;
+}

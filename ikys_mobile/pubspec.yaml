@@ -1,0 +1,34 @@
+name: ikys_mobile
+description: İKYS - İnsan Kaynakları Yönetim Sistemi (Mobil)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  dio: ^5.4.0                    # HTTP (axios karşılığı)
+  flutter_secure_storage: ^9.0.0 # Token saklama (expo-secure-store karşılığı)
+  provider: ^6.1.1              # Durum yönetimi (React Context karşılığı)
+  go_router: ^13.2.0            # Yönlendirme (expo-router karşılığı)
+  mobile_scanner: ^4.0.1        # QR okuma (expo-camera karşılığı)
+  geolocator: ^11.0.0           # Konum (expo-location karşılığı)
+  intl: ^0.19.0                 # Tarih biçimleme
+  flutter_local_notifications: ^17.2.3  # Yerel heads-up bildirim (önemli/çok önemli)
+  firebase_core: ^3.6.0         # Firebase çekirdek
+  firebase_messaging: ^15.1.3   # FCM push (uygulama kapalıyken bildirim)
+  file_picker: 8.1.2            # Masraf fişi/faturası seçimi (PDF/resim)
+  path_provider: ^2.1.4         # Geçici dosya dizini (indirilen fiş için)
+  open_filex: ^4.5.0            # İndirilen fişi varsayılan uygulamada açma
+
+dev_dependencies:
+  flutter_lints: ^3.0.0
+
+dependency_overrides:
+  flutter_plugin_android_lifecycle: 2.0.24
+
+flutter:
+  uses-material-design: true

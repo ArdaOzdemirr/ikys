@@ -648,6 +648,13 @@ export class LeaveService {
     return this.prisma.holiday.create({ data: { ...data, date: new Date(data.date) } });
   }
 
+  async removeHoliday(id: string) {
+    const holiday = await this.prisma.holiday.findUnique({ where: { id } });
+    if (!holiday) throw new NotFoundException('Tatil bulunamadı');
+    await this.prisma.holiday.delete({ where: { id } });
+    return { success: true };
+  }
+
   // === Helpers ===
 
   /**

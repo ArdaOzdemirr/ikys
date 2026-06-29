@@ -110,4 +110,11 @@ export class LeaveController {
   createHoliday(@Body() body: any) {
     return this.service.createHoliday(body);
   }
+
+  @Delete('holidays/:id')
+  @Roles(Role.HR, Role.ADMIN)
+  @ApiOperation({ summary: 'Resmi tatili sil' })
+  removeHoliday(@Param('id') id: string) {
+    return this.service.removeHoliday(id);
+  }
 }

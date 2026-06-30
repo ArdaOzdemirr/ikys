@@ -73,8 +73,18 @@ class LeaveService {
     });
   }
 
+  /// Yalnızca henüz onaylanmamış (PENDING) kendi talebini geri çeker.
   static Future<void> cancel(String id) async {
     await ApiClient.instance.dio.delete('/leave/requests/$id');
+  }
+
+  /// Onaylı (ve henüz başlamamış) bir izin için amir onayı gerektiren iptal talebi oluşturur.
+  static Future<void> requestCancellation(String id) async {
+    await ApiClient.instance.dio.post('/leave/requests/$id/request-cancellation');
+  }
+
+  static Future<void> remove(String id) async {
+    await ApiClient.instance.dio.delete('/leave/requests/$id/remove');
   }
 }
 
@@ -150,6 +160,19 @@ class ApprovalService {
     await ApiClient.instance.dio.patch('/leave/requests/$id/approve', data: {
       'approved': false,
       'rejectionReason': reason,
+    });
+  }
+
+  /// Onayını bekleyen izin iptal talepleri (onaylı bir izni çalışan iptal etmek istedi).
+  static Future<List<PendingApproval>> pendingCancellations() async {
+    final res = await ApiClient.instance.dio.get('/leave/requests/pending-cancellations');
+    return (res.data as List).map((e) => PendingApproval.fromJson(e)).toList();
+  }
+
+  static Future<void> decideCancellation(String id, bool approved, {String? rejectionReason}) async {
+    await ApiClient.instance.dio.patch('/leave/requests/$id/cancellation-decision', data: {
+      'approved': approved,
+      if (rejectionReason != null && rejectionReason.isNotEmpty) 'rejectionReason': rejectionReason,
     });
   }
 }

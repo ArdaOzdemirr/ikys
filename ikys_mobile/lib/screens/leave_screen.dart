@@ -22,6 +22,7 @@ const _statusStyle = {
   'APPROVED': (label: 'Onaylandı', bg: Color(0xFFDCFCE7), fg: Color(0xFF166534)),
   'REJECTED': (label: 'Reddedildi', bg: Color(0xFFFEE2E2), fg: Color(0xFF991B1B)),
   'CANCELLED': (label: 'İptal', bg: Color(0xFFF3F4F6), fg: Color(0xFF6B7280)),
+  'CANCEL_REQUESTED': (label: 'İptal Onayı Bekliyor', bg: Color(0xFFFEF3C7), fg: Color(0xFF92400E)),
 };
 
 String _leaveName(LeaveRequest r) {
@@ -66,6 +67,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
   void _snack(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
+  /// Henüz onaylanmamış (PENDING) talebi doğrudan geri çeker.
   Future<void> _cancel(String id) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -85,6 +87,30 @@ class _LeaveScreenState extends State<LeaveScreen> {
       await _load();
     } catch (e) {
       _snack(ApiClient.errorMessage(e, 'İptal edilemedi'));
+    }
+  }
+
+  /// Onaylı (henüz başlamamış) izin için amir onayı gerektiren iptal talebi oluşturur.
+  Future<void> _requestCancellation(String id) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('İptal Talebi Oluştur'),
+        content: const Text(
+            'Bu izin onaylanmıştı. İptal etmek için amir onayı gerekir. Talep gönderilsin mi?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Vazgeç')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Talep Gönder')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await LeaveService.requestCancellation(id);
+      _snack('İptal talebiniz amire iletildi.');
+      await _load();
+    } catch (e) {
+      _snack(ApiClient.errorMessage(e, 'İşlem başarısız'));
     }
   }
 
@@ -165,7 +191,9 @@ class _LeaveScreenState extends State<LeaveScreen> {
 
   Widget _requestCard(LeaveRequest r) {
     final s = _statusStyle[r.status] ?? _statusStyle['PENDING']!;
-    final canCancel = r.status == 'PENDING' || r.status == 'APPROVED';
+    final canWithdraw = r.status == 'PENDING';
+    final canRequestCancellation = r.status == 'APPROVED' && r.startDate.isAfter(DateTime.now());
+    final started = r.status == 'APPROVED' && !r.startDate.isAfter(DateTime.now());
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -218,13 +246,28 @@ class _LeaveScreenState extends State<LeaveScreen> {
               child: Text('Ret: ${r.rejectionReason}',
                   style: const TextStyle(color: Colors.red, fontSize: 13)),
             ),
-          if (canCancel)
+          if (started)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text('Başlamış izin iptal edilemez',
+                  style: TextStyle(color: Colors.grey, fontSize: 12)),
+            ),
+          if (canWithdraw)
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
                 onPressed: () => _cancel(r.id),
                 style: TextButton.styleFrom(padding: EdgeInsets.zero),
                 child: const Text('İptal Et', style: TextStyle(color: Colors.red)),
+              ),
+            ),
+          if (canRequestCancellation)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => _requestCancellation(r.id),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                child: const Text('İptal Talebi Oluştur', style: TextStyle(color: Color(0xFFB45309))),
               ),
             ),
         ],

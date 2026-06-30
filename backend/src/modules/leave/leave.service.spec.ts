@@ -1,5 +1,5 @@
 import { LeaveService } from './leave.service';
-import { LeaveType } from '@prisma/client';
+import { LeaveType, LeaveStatus } from '@prisma/client';
 
 /**
  * "İlk yıl izin kuralı" (bkz. backend/STEPS.md):
@@ -134,5 +134,118 @@ describe('LeaveService - ilk yıl izin kuralı', () => {
 
     expect(captured[0].requiresPaymentDecision).toBe(true);
     expect(captured[0].deductFromYear).toBe(2027);
+  });
+});
+
+/**
+ * "İzin başladıktan sonra silinemesin, onaylı izin silinirken üst onayı
+ * istensin" kuralı: onaylı izinler artık doğrudan silinmiyor/iptal
+ * edilmiyor; amirin onayladığı bir iptal talebi akışından geçiyor.
+ */
+describe('LeaveService - izin iptal onay akışı', () => {
+  function buildService(leaveRequest: any) {
+    let updateArgs: any;
+    let balanceUpdated = false;
+    const prisma = {
+      personnel: {
+        findFirst: jest.fn().mockResolvedValue(null), // fallbackApprover: İK/Admin yok
+      },
+      leaveRequest: {
+        findUnique: jest.fn().mockResolvedValue(leaveRequest),
+        update: jest.fn((args: any) => {
+          updateArgs = args;
+          return { ...leaveRequest, ...args.data };
+        }),
+      },
+      leaveApprovalStep: { updateMany: jest.fn() },
+      leaveBalance: {
+        update: jest.fn(() => {
+          balanceUpdated = true;
+          return Promise.resolve({});
+        }),
+      },
+      $transaction: jest.fn((cb: any) =>
+        cb({
+          leaveRequest: prisma.leaveRequest,
+          leaveBalance: prisma.leaveBalance,
+        }),
+      ),
+    } as any;
+    const notifications = { create: jest.fn() };
+    const service = new LeaveService(prisma as any, notifications as any);
+    return { service, prisma, notifications, getUpdateArgs: () => updateArgs, wasBalanceRestored: () => balanceUpdated };
+  }
+
+  const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const past = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  it('cancel(): yalnızca PENDING talepler doğrudan iptal edilebilir', async () => {
+    const { service } = buildService({
+      id: 'req1', personnelId: 'p1', status: LeaveStatus.APPROVED,
+    });
+    await expect(service.cancel('req1', 'p1')).rejects.toThrow();
+  });
+
+  it('remove(): onaylı (APPROVED) izin doğrudan silinemez', async () => {
+    const { service } = buildService({
+      id: 'req1', personnelId: 'p1', status: LeaveStatus.APPROVED,
+    });
+    await expect(service.remove('req1', 'p1', 'EMPLOYEE')).rejects.toThrow();
+  });
+
+  it('requestCancellation(): başlamış izin için iptal talebi oluşturulamaz', async () => {
+    const { service } = buildService({
+      id: 'req1', personnelId: 'p1', status: LeaveStatus.APPROVED,
+      startDate: past, personnel: { firstName: 'A', lastName: 'B', managerId: 'm1' },
+    });
+    await expect(service.requestCancellation('req1', 'p1')).rejects.toThrow();
+  });
+
+  it('requestCancellation(): henüz başlamamış onaylı izin için amire iptal talebi gider', async () => {
+    const { service, getUpdateArgs, notifications } = buildService({
+      id: 'req1', personnelId: 'p1', status: LeaveStatus.APPROVED,
+      startDate: future, personnel: { firstName: 'A', lastName: 'B', managerId: 'm1' },
+    });
+
+    await service.requestCancellation('req1', 'p1');
+
+    expect(getUpdateArgs().data.status).toBe(LeaveStatus.CANCEL_REQUESTED);
+    expect(getUpdateArgs().data.cancelApproverId).toBe('m1');
+    expect(notifications.create).toHaveBeenCalled();
+  });
+
+  it('decideCancellation(): yetkisiz biri onaylayamaz', async () => {
+    const { service } = buildService({
+      id: 'req1', personnelId: 'p1', status: LeaveStatus.CANCEL_REQUESTED,
+      cancelApproverId: 'm1', startDate: future,
+    });
+    await expect(
+      service.decideCancellation('req1', 'baska-biri', true, 'MANAGER'),
+    ).rejects.toThrow();
+  });
+
+  it('decideCancellation(): onaylanırsa izin CANCELLED olur ve bakiye iade edilir', async () => {
+    const { service, getUpdateArgs, wasBalanceRestored } = buildService({
+      id: 'req1', personnelId: 'p1', status: LeaveStatus.CANCEL_REQUESTED,
+      cancelApproverId: 'm1', startDate: future, totalDays: 3, deductFromYear: 2026,
+      requiresPaymentDecision: false, type: LeaveType.ANNUAL, category: null,
+    });
+
+    await service.decideCancellation('req1', 'm1', true, 'MANAGER');
+
+    expect(getUpdateArgs().data.status).toBe(LeaveStatus.CANCELLED);
+    expect(wasBalanceRestored()).toBe(true);
+  });
+
+  it('decideCancellation(): reddedilirse izin tekrar APPROVED olur', async () => {
+    const { service, getUpdateArgs, notifications } = buildService({
+      id: 'req1', personnelId: 'p1', status: LeaveStatus.CANCEL_REQUESTED,
+      cancelApproverId: 'm1', startDate: future,
+    });
+
+    await service.decideCancellation('req1', 'm1', false, 'MANAGER', 'Ekip yoğun');
+
+    expect(getUpdateArgs().data.status).toBe(LeaveStatus.APPROVED);
+    expect(notifications.create).toHaveBeenCalled();
   });
 });

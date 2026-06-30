@@ -8,6 +8,7 @@ const statusLabel: Record<string, { label: string; cls: string }> = {
   PENDING: { label: 'Beklemede', cls: 'bg-amber-100 text-amber-700' },
   REJECTED: { label: 'Reddedildi', cls: 'bg-red-100 text-red-700' },
   CANCELLED: { label: 'İptal', cls: 'bg-gray-100 text-gray-500' },
+  CANCEL_REQUESTED: { label: 'İptal Onayı Bekliyor', cls: 'bg-amber-100 text-amber-800' },
 };
 
 const fmt = (d: string) => new Date(d).toLocaleDateString('tr-TR');
@@ -36,7 +37,9 @@ export default function LeaveListPage() {
         <select className="input max-w-[180px]" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="APPROVED">Onaylanmış</option>
           <option value="PENDING">Bekleyen</option>
+          <option value="CANCEL_REQUESTED">İptal Onayı Bekleyen</option>
           <option value="REJECTED">Reddedilen</option>
+          <option value="CANCELLED">İptal Edilen</option>
           <option value="ALL">Tümü</option>
         </select>
         <select className="input max-w-[140px]" value={yr} onChange={(e) => setYr(e.target.value)}>

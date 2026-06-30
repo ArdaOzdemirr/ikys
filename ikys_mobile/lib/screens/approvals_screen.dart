@@ -16,6 +16,7 @@ class ApprovalsScreen extends StatefulWidget {
 
 class _ApprovalsScreenState extends State<ApprovalsScreen> {
   List<PendingApproval> _items = [];
+  List<PendingApproval> _cancellations = [];
   bool _loading = true;
 
   @override
@@ -31,7 +32,56 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     } catch (e) {
       if (mounted) _snack(ApiClient.errorMessage(e, 'Yüklenemedi'));
     }
+    try {
+      _cancellations = await ApprovalService.pendingCancellations();
+    } catch (_) {
+      // 403 olabilir (MANAGER/HR/ADMIN değilse); sessizce boş bırak
+    }
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _approveCancellation(PendingApproval a) async {
+    try {
+      await ApprovalService.decideCancellation(a.id, true);
+      _snack('İptal talebi onaylandı');
+      await _load();
+    } catch (e) {
+      _snack(ApiClient.errorMessage(e, 'İşlem başarısız'));
+    }
+  }
+
+  Future<void> _rejectCancellation(PendingApproval a) async {
+    final ctrl = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('İptal Talebini Reddet'),
+        content: TextField(
+          controller: ctrl,
+          maxLines: 3,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Neden reddediliyor? (opsiyonel)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Vazgeç')),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+            child: const Text('Reddet'),
+          ),
+        ],
+      ),
+    );
+    if (reason == null) return;
+    try {
+      await ApprovalService.decideCancellation(a.id, false, rejectionReason: reason);
+      _snack('İptal talebi reddedildi; izin geçerliliğini koruyor');
+      await _load();
+    } catch (e) {
+      _snack(ApiClient.errorMessage(e, 'İşlem başarısız'));
+    }
   }
 
   void _snack(String m) =>
@@ -112,31 +162,96 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
+    if (_items.isEmpty && _cancellations.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          children: const [
+            Padding(
+              padding: EdgeInsets.only(top: 80),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.check_circle_outline, size: 40, color: Colors.green),
+                    SizedBox(height: 8),
+                    Text('Onay sırası sizde olan talep yok',
+                        style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _load,
-      child: _items.isEmpty
-          ? ListView(
-              children: const [
-                Padding(
-                  padding: EdgeInsets.only(top: 80),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(Icons.check_circle_outline,
-                            size: 40, color: Colors.green),
-                        SizedBox(height: 8),
-                        Text('Onay sırası sizde olan talep yok',
-                            style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  ),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          ..._items.map(_card),
+          if (_cancellations.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('İptal Talepleri',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            const SizedBox(height: 10),
+            ..._cancellations.map(_cancellationCard),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _cancellationCard(PendingApproval a) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${a.requesterName} (${a.employeeNo})',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const SizedBox(height: 6),
+          Text(
+            '${a.leaveName} · ${a.totalDays.toStringAsFixed(0)} gün\n'
+            '${DateFormat('dd MMM').format(a.startDate)} – '
+            '${DateFormat('dd MMM yyyy').format(a.endDate)}',
+            style: const TextStyle(color: Color(0xFF374151)),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text('Bu izin onaylanmıştı; çalışan iptal talep etti.',
+                style: TextStyle(color: Color(0xFFB45309), fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => _approveCancellation(a),
+                  icon: const Icon(Icons.check),
+                  label: const Text('Onayla'),
                 ),
-              ],
-            )
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: _items.map(_card).toList(),
-            ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _rejectCancellation(a),
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  icon: const Icon(Icons.close),
+                  label: const Text('Reddet'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

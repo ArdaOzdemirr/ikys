@@ -54,10 +54,45 @@ export class LeaveController {
   }
 
   @Delete('requests/:id')
+  @ApiOperation({ summary: 'Henüz onaylanmamış (PENDING) kendi talebini geri çek' })
   async cancel(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
     if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.cancel(id, personnel.id);
+  }
+
+  @Post('requests/:id/request-cancellation')
+  @ApiOperation({ summary: 'Onaylı izin için amir onayı gerektiren iptal talebi oluştur' })
+  async requestCancellation(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+    return this.service.requestCancellation(id, personnel.id);
+  }
+
+  @Get('requests/pending-cancellations')
+  @Roles(Role.MANAGER, Role.HR, Role.ADMIN)
+  @ApiOperation({ summary: 'Onayını bekleyen izin iptal talepleri' })
+  async pendingCancellations(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+    return this.service.pendingCancellations(personnel.id, role);
+  }
+
+  @Patch('requests/:id/cancellation-decision')
+  @Roles(Role.MANAGER, Role.HR, Role.ADMIN)
+  @ApiOperation({ summary: 'İzin iptal talebini onayla/reddet' })
+  async decideCancellation(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+    @Param('id') id: string,
+    @Body() dto: ApproveLeaveDto,
+  ) {
+    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+    return this.service.decideCancellation(id, personnel.id, dto.approved, role, dto.rejectionReason);
   }
 
   @Delete('requests/:id/remove')

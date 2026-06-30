@@ -53,6 +53,7 @@ export default function LeavePage() {
       qc.invalidateQueries({ queryKey: ['leave-me'] });
       qc.invalidateQueries({ queryKey: ['leave-balance'] });
     },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
   });
 
   const remove = useMutation({
@@ -63,6 +64,15 @@ export default function LeavePage() {
       qc.invalidateQueries({ queryKey: ['leave-balance'] });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Silinemedi'),
+  });
+
+  const requestCancellation = useMutation({
+    mutationFn: (id: string) => api.post(`/leave/requests/${id}/request-cancellation`, {}),
+    onSuccess: () => {
+      toast.success('İptal talebiniz amire iletildi');
+      qc.invalidateQueries({ queryKey: ['leave-me'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
   });
 
   return (
@@ -198,6 +208,12 @@ export default function LeavePage() {
                       {r.paymentType === 'PAID' ? 'Ücretli' : 'Ücretsiz'}
                     </p>
                   )}
+                  {r.status === 'CANCEL_REQUESTED' && (
+                    <p className="text-xs text-amber-600 mt-1">İptal talebiniz amir onayını bekliyor</p>
+                  )}
+                  {r.status === 'APPROVED' && new Date(r.startDate) <= new Date() && (
+                    <p className="text-xs text-gray-400 mt-1">Başlamış izin iptal edilemez</p>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-3 items-center">
@@ -209,14 +225,28 @@ export default function LeavePage() {
                         İptal
                       </button>
                     )}
-                    <button
-                      onClick={() => {
-                        if (confirm('Bu izin kaydı kalıcı olarak silinsin mi?')) remove.mutate(r.id);
-                      }}
-                      className="text-red-600 hover:underline text-xs"
-                    >
-                      Sil
-                    </button>
+                    {r.status === 'APPROVED' && new Date(r.startDate) > new Date() && (
+                      <button
+                        onClick={() => {
+                          if (confirm('Bu izin için amir onayı gerektiren bir iptal talebi oluşturulsun mu?')) {
+                            requestCancellation.mutate(r.id);
+                          }
+                        }}
+                        className="text-amber-600 hover:underline text-xs"
+                      >
+                        İptal Talebi Oluştur
+                      </button>
+                    )}
+                    {(r.status === 'REJECTED' || r.status === 'CANCELLED') && (
+                      <button
+                        onClick={() => {
+                          if (confirm('Bu izin kaydı kalıcı olarak silinsin mi?')) remove.mutate(r.id);
+                        }}
+                        className="text-red-600 hover:underline text-xs"
+                      >
+                        Sil
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -234,6 +264,7 @@ function LeaveStatusBadge({ status }: { status: string }) {
     APPROVED: { color: 'bg-green-100 text-green-800', label: 'Onaylandı' },
     REJECTED: { color: 'bg-red-100 text-red-800', label: 'Reddedildi' },
     CANCELLED: { color: 'bg-gray-100 text-gray-700', label: 'İptal' },
+    CANCEL_REQUESTED: { color: 'bg-amber-100 text-amber-800', label: 'İptal Onayı Bekliyor' },
   };
   const x = c[status] || { color: 'bg-gray-100', label: status };
   return <span className={`badge ${x.color}`}>{x.label}</span>;

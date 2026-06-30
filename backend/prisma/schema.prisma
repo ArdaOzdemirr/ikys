@@ -62,6 +62,7 @@ enum LeaveStatus {
   APPROVED // Onaylandı
   REJECTED // Reddedildi
   CANCELLED // İptal edildi
+  CANCEL_REQUESTED // Onaylı izin için iptal talebi amire sunuldu
 }
 
 enum PaymentType {
@@ -105,6 +106,9 @@ enum NotificationType {
   EXPENSE_APPROVED // Masraf/para talebi onaylandı (çalışana)
   EXPENSE_REJECTED // Masraf/para talebi reddedildi (çalışana)
   EXPENSE_PAID // Masraf/para talebi ödendi (çalışana)
+  LEAVE_CANCEL_PENDING // Onayına sunulan izin iptal talebi var (amire)
+  LEAVE_CANCEL_APPROVED // İzin iptal talebi onaylandı (çalışana)
+  LEAVE_CANCEL_REJECTED // İzin iptal talebi reddedildi, izin geçerliliğini korur (çalışana)
 }
 
 // İzin onay zincirindeki tek bir adımın durumu
@@ -238,6 +242,7 @@ model Personnel {
   leaveBalances     LeaveBalance[]
   leaveRequests     LeaveRequest[]    @relation("Requester")
   approvedLeaves    LeaveRequest[]    @relation("Approver")
+  cancelApprovedLeaves LeaveRequest[] @relation("CancelApprover")
   payrolls          Payroll[]
   expenses          Expense[]         @relation("ExpenseOwner")
   approvedExpenses  Expense[]         @relation("ExpenseApprover")
@@ -381,12 +386,18 @@ model LeaveRequest {
   // 1 = ilk amir. Her onayda artar; zincir bitince izin onaylanır.
   currentStepOrder Int @default(1)
 
+  // Onaylı bir izni iptal etmek için amir onayı gerekir (bkz. CANCEL_REQUESTED).
+  cancelApproverId    String?
+  cancelRequestedAt   DateTime?
+  cancelRejectionReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  personnel Personnel      @relation("Requester", fields: [personnelId], references: [id])
-  approver  Personnel?     @relation("Approver", fields: [approverId], references: [id])
-  category  LeaveCategory? @relation(fields: [categoryId], references: [id])
+  personnel     Personnel      @relation("Requester", fields: [personnelId], references: [id])
+  approver      Personnel?     @relation("Approver", fields: [approverId], references: [id])
+  cancelApprover Personnel?    @relation("CancelApprover", fields: [cancelApproverId], references: [id])
+  category      LeaveCategory? @relation(fields: [categoryId], references: [id])
 
   approvalSteps LeaveApprovalStep[]
 

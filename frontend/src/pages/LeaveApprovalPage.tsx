@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
-import { Check, X, ArrowUpCircle } from 'lucide-react';
+import { Check, X, ArrowUpCircle, Ban } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useState } from 'react';
 
@@ -12,10 +12,17 @@ export default function LeaveApprovalPage() {
   const [reason, setReason] = useState('');
   // İlk yıl izinlerinde son onayda ücretli/ücretsiz seçimi
   const [payDecision, setPayDecision] = useState<any | null>(null);
+  const [cancelRejectId, setCancelRejectId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const { data: pending } = useQuery<any[]>({
     queryKey: ['leave-pending'],
     queryFn: () => api.get('/leave/requests/pending'),
+  });
+
+  const { data: pendingCancellations } = useQuery<any[]>({
+    queryKey: ['leave-pending-cancellations'],
+    queryFn: () => api.get('/leave/requests/pending-cancellations'),
   });
 
   const decide = useMutation({
@@ -32,6 +39,19 @@ export default function LeaveApprovalPage() {
       setRejectId(null);
       setReason('');
       setPayDecision(null);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
+  });
+
+  const decideCancellation = useMutation({
+    mutationFn: ({ id, approved, rejectionReason }: any) =>
+      api.patch(`/leave/requests/${id}/cancellation-decision`, { approved, rejectionReason }),
+    onSuccess: () => {
+      toast.success('İşlem tamamlandı');
+      qc.invalidateQueries({ queryKey: ['leave-pending-cancellations'] });
+      qc.invalidateQueries({ queryKey: ['notif-unread'] });
+      setCancelRejectId(null);
+      setCancelReason('');
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
   });
@@ -113,6 +133,99 @@ export default function LeaveApprovalPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* İptal Talepleri */}
+      <div className="space-y-3 pt-4 border-t">
+        <div className="flex items-center gap-2">
+          <Ban className="text-amber-600" size={22} />
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">İptal Talepleri</h2>
+            <p className="text-gray-600 text-sm">
+              {pendingCancellations?.length ?? 0} onaylı izin için iptal talebi onayınızı bekliyor
+            </p>
+          </div>
+        </div>
+        {pendingCancellations?.length === 0 ? (
+          <div className="card text-center py-8">
+            <p className="text-gray-600">Bekleyen iptal talebi yok</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pendingCancellations?.map((r: any) => (
+              <div key={r.id} className="card">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      {r.personnel.firstName} {r.personnel.lastName}{' '}
+                      <span className="text-xs text-gray-500">({r.personnel.employeeNo})</span>
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      <strong>{catName(r)}</strong> · {r.totalDays} gün ·{' '}
+                      {new Date(r.startDate).toLocaleDateString('tr-TR')} -{' '}
+                      {new Date(r.endDate).toLocaleDateString('tr-TR')}
+                    </p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      Bu izin onaylanmıştı; çalışan iptal talep etti.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => decideCancellation.mutate({ id: r.id, approved: true })}
+                      className="btn-primary flex items-center gap-1"
+                    >
+                      <Check size={16} /> Onayla
+                    </button>
+                    <button
+                      onClick={() => setCancelRejectId(r.id)}
+                      className="btn-danger flex items-center gap-1"
+                    >
+                      <X size={16} /> Reddet
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* İptal red gerekçesi */}
+      {cancelRejectId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <h3 className="font-semibold text-lg mb-1">İptal Talebini Reddet</h3>
+            <p className="text-sm text-gray-600 mb-3">İzin onaylı kalmaya devam edecek.</p>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="input"
+              rows={4}
+              placeholder="Neden reddediliyor? (opsiyonel)"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() =>
+                  decideCancellation.mutate({
+                    id: cancelRejectId,
+                    approved: false,
+                    rejectionReason: cancelReason,
+                  })
+                }
+                className="btn-danger flex-1"
+              >
+                Reddet
+              </button>
+              <button
+                onClick={() => { setCancelRejectId(null); setCancelReason(''); }}
+                className="btn-secondary"
+              >
+                Vazgeç
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

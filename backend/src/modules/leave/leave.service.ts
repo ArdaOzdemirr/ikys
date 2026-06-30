@@ -371,21 +371,24 @@ export class LeaveService {
     });
   }
 
+  /**
+   * Henüz hiç onaylanmamış (PENDING) kendi talebini geri çeker. Onaylı izinler
+   * için kullanılamaz; amir onayı gerektiren iptal talebi akışı kullanılmalı
+   * (bkz. requestCancellation) çünkü onaylı izin başka kişilerin (ör. amir,
+   * vardiya planı) artık üzerine plan yaptığı bir taahhüttür.
+   */
   async cancel(requestId: string, personnelId: string) {
     const req = await this.prisma.leaveRequest.findUnique({
       where: { id: requestId },
-      include: { category: true },
     });
     if (!req) throw new NotFoundException('Talep bulunamadı');
     if (req.personnelId !== personnelId)
       throw new ForbiddenException('Bu talep size ait değil');
-    if (req.status === LeaveStatus.APPROVED && req.startDate <= new Date()) {
-      throw new BadRequestException('Başlamış izin iptal edilemez');
+    if (req.status !== LeaveStatus.PENDING) {
+      throw new BadRequestException(
+        'Yalnızca onay bekleyen (henüz onaylanmamış) talepler bu şekilde iptal edilebilir',
+      );
     }
-
-    const affectsBalance = req.category
-      ? req.category.affectsAnnualBalance
-      : req.type === LeaveType.ANNUAL;
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.leaveRequest.update({
@@ -397,16 +400,129 @@ export class LeaveService {
         where: { requestId, status: ApprovalStepStatus.PENDING },
         data: { status: ApprovalStepStatus.SKIPPED },
       });
-      // Sadece daha önce bakiyeden düşülmüş (onaylı + ücretli + bir yıla yazılmış) izinlerde geri ver
-      const wasPaid = req.requiresPaymentDecision
-        ? req.paymentType === 'PAID'
-        : true;
-      if (
-        req.status === LeaveStatus.APPROVED &&
-        affectsBalance &&
-        wasPaid &&
-        req.deductFromYear != null
-      ) {
+      return updated;
+    });
+  }
+
+  /**
+   * Onaylı bir izni iptal etmek artık doğrudan silinmiyor; amirin onayına sunulur.
+   * Henüz başlamamış olmalı (başlamış izin hiçbir şekilde iptal edilemez).
+   */
+  async requestCancellation(requestId: string, personnelId: string) {
+    const req = await this.prisma.leaveRequest.findUnique({
+      where: { id: requestId },
+      include: { personnel: true },
+    });
+    if (!req) throw new NotFoundException('Talep bulunamadı');
+    if (req.personnelId !== personnelId) {
+      throw new ForbiddenException('Bu talep size ait değil');
+    }
+    if (req.status !== LeaveStatus.APPROVED) {
+      throw new BadRequestException(
+        'Yalnızca onaylanmış izinler için iptal talebi oluşturulabilir',
+      );
+    }
+    if (req.startDate <= new Date()) {
+      throw new BadRequestException('Başlamış izin iptal edilemez');
+    }
+
+    const approverId =
+      req.personnel.managerId ?? (await this.fallbackApprover(personnelId));
+    if (!approverId) {
+      throw new BadRequestException(
+        'İptal talebinizi onaylayacak bir amir bulunamadı',
+      );
+    }
+
+    const updated = await this.prisma.leaveRequest.update({
+      where: { id: requestId },
+      data: {
+        status: LeaveStatus.CANCEL_REQUESTED,
+        cancelApproverId: approverId,
+        cancelRequestedAt: new Date(),
+        cancelRejectionReason: null,
+      },
+    });
+
+    await this.notifications.create({
+      recipientId: approverId,
+      senderId: personnelId,
+      type: NotificationType.LEAVE_CANCEL_PENDING,
+      title: 'İzin iptal talebi onayınızı bekliyor',
+      body: `${req.personnel.firstName} ${req.personnel.lastName} onaylı izninin iptalini talep etti.`,
+      refType: 'LeaveRequest',
+      refId: requestId,
+    });
+
+    return updated;
+  }
+
+  /**
+   * İptal talebine amirin kararı. Onaylanırsa izin gerçekten iptal edilir
+   * (bakiye varsa iade edilir); reddedilirse izin APPROVED olarak kalmaya devam eder.
+   */
+  async decideCancellation(
+    requestId: string,
+    approverPersonnelId: string,
+    approved: boolean,
+    role?: string,
+    rejectionReason?: string,
+  ) {
+    const req = await this.prisma.leaveRequest.findUnique({
+      where: { id: requestId },
+      include: { category: true },
+    });
+    if (!req) throw new NotFoundException('Talep bulunamadı');
+    if (req.status !== LeaveStatus.CANCEL_REQUESTED) {
+      throw new BadRequestException('Bu talep için bekleyen bir iptal talebi yok');
+    }
+    const isAdmin = role === 'ADMIN';
+    if (req.cancelApproverId !== approverPersonnelId && !isAdmin) {
+      throw new ForbiddenException('Bu iptal talebini onaylama yetkiniz yok');
+    }
+
+    if (!approved) {
+      const updated = await this.prisma.leaveRequest.update({
+        where: { id: requestId },
+        data: {
+          status: LeaveStatus.APPROVED,
+          cancelRejectionReason: rejectionReason ?? null,
+        },
+      });
+      await this.notifications.create({
+        recipientId: req.personnelId,
+        senderId: approverPersonnelId,
+        type: NotificationType.LEAVE_CANCEL_REJECTED,
+        title: 'İzin iptal talebiniz reddedildi',
+        body: rejectionReason
+          ? `Gerekçe: ${rejectionReason}. İzniniz geçerliliğini koruyor.`
+          : 'İzniniz geçerliliğini koruyor.',
+        refType: 'LeaveRequest',
+        refId: requestId,
+      });
+      return updated;
+    }
+
+    if (req.startDate <= new Date()) {
+      throw new BadRequestException(
+        'İzin onay beklerken başlamış; artık iptal edilemez',
+      );
+    }
+
+    const affectsBalance = req.category
+      ? req.category.affectsAnnualBalance
+      : req.type === LeaveType.ANNUAL;
+    const wasPaid = req.requiresPaymentDecision
+      ? req.paymentType === 'PAID'
+      : true;
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.leaveRequest.update({
+        where: { id: requestId },
+        data: { status: LeaveStatus.CANCELLED },
+      });
+
+      if (affectsBalance && wasPaid && req.deductFromYear != null) {
         await tx.leaveBalance
           .update({
             where: {
@@ -423,6 +539,20 @@ export class LeaveService {
           })
           .catch(() => null);
       }
+
+      await this.notifications.create(
+        {
+          recipientId: req.personnelId,
+          senderId: approverPersonnelId,
+          type: NotificationType.LEAVE_CANCEL_APPROVED,
+          title: 'İzin iptal talebiniz onaylandı',
+          body: `${req.totalDays} günlük izniniz iptal edildi.`,
+          refType: 'LeaveRequest',
+          refId: requestId,
+        },
+        tx,
+      );
+
       return updated;
     });
   }
@@ -481,6 +611,27 @@ export class LeaveService {
       });
   }
 
+  /**
+   * Onayını bekleyen iptal talepleri. HR/Admin tümünü görür; diğerleri
+   * yalnızca kendilerine atanmış (cancelApproverId) talepleri görür.
+   */
+  pendingCancellations(personnelId: string, role: string) {
+    const seesAll = ['HR', 'ADMIN'].includes(role);
+    return this.prisma.leaveRequest.findMany({
+      where: {
+        status: LeaveStatus.CANCEL_REQUESTED,
+        ...(seesAll ? {} : { cancelApproverId: personnelId }),
+      },
+      include: {
+        personnel: {
+          select: { firstName: true, lastName: true, employeeNo: true },
+        },
+        category: true,
+      },
+      orderBy: { cancelRequestedAt: 'asc' },
+    });
+  }
+
   myBalance(personnelId: string, year?: number) {
     return this.prisma.leaveBalance.findMany({
       where: { personnelId, year: year || new Date().getFullYear() },
@@ -494,7 +645,6 @@ export class LeaveService {
   async remove(requestId: string, personnelId: string, role: string) {
     const req = await this.prisma.leaveRequest.findUnique({
       where: { id: requestId },
-      include: { category: true },
     });
     if (!req) throw new NotFoundException('Talep bulunamadı');
 
@@ -503,41 +653,20 @@ export class LeaveService {
       throw new ForbiddenException('Bu talep size ait değil');
     }
 
-    const affectsBalance = req.category
-      ? req.category.affectsAnnualBalance
-      : req.type === LeaveType.ANNUAL;
-    const wasPaid = req.requiresPaymentDecision
-      ? req.paymentType === 'PAID'
-      : true;
+    // Onaylı (veya onayı zaten istenmiş) izinler doğrudan silinemez; amir
+    // onayı gerektiren iptal talebi akışından geçmeli (requestCancellation).
+    if (
+      req.status === LeaveStatus.APPROVED ||
+      req.status === LeaveStatus.CANCEL_REQUESTED
+    ) {
+      throw new BadRequestException(
+        'Onaylanmış bir izin doğrudan silinemez; amir onayı gerektiren iptal talebi oluşturun',
+      );
+    }
 
-    return this.prisma.$transaction(async (tx) => {
-      // Daha önce düşülmüş bakiyeyi geri ver
-      if (
-        req.status === LeaveStatus.APPROVED &&
-        affectsBalance &&
-        wasPaid &&
-        req.deductFromYear != null
-      ) {
-        await tx.leaveBalance
-          .update({
-            where: {
-              personnelId_year_type: {
-                personnelId: req.personnelId,
-                year: req.deductFromYear,
-                type: LeaveType.ANNUAL,
-              },
-            },
-            data: {
-              usedDays: { decrement: req.totalDays },
-              remainingDays: { increment: req.totalDays },
-            },
-          })
-          .catch(() => null);
-      }
-      // Onay adımları cascade ile silinir (schema onDelete: Cascade)
-      await tx.leaveRequest.delete({ where: { id: requestId } });
-      return { success: true };
-    });
+    // Onay adımları cascade ile silinir (schema onDelete: Cascade)
+    await this.prisma.leaveRequest.delete({ where: { id: requestId } });
+    return { success: true };
   }
 
   /**

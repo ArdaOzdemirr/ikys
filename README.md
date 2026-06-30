@@ -82,13 +82,37 @@ docker compose up -d
 ```
 Frontend: `http://localhost:8080`, Backend: `http://localhost:3000`.
 
-## E-posta Bildirimleri (Gmail Uygulama Şifresi)
+## E-posta Bildirimleri
 
 Bildirimler (izin onayı, mesaj, duyuru vb.) oluşturulduğunda hem uygulama içi
-bildirim hem de e-posta gönderilir. E-posta gönderimi `backend/.env` içindeki
-`SMTP_*` değişkenleri boşsa otomatik olarak pasif kalır; uygulamayı düşürmez.
+bildirim hem de e-posta gönderilir. Hiçbir sağlayıcı yapılandırılmazsa e-posta
+gönderimi otomatik olarak pasif kalır; uygulamayı düşürmez.
 
-Gmail ile aktif etmek için:
+### Seçenek A: Resend (önerilen)
+
+Ekstra paket kurulumu gerektirmez (Node'un yerleşik `fetch`'i kullanılır).
+
+1. [resend.com](https://resend.com)'da ücretsiz hesap açın.
+2. Dashboard → API Keys → "Create API Key".
+3. `backend/.env` dosyasında doldurun:
+   ```env
+   RESEND_API_KEY=re_xxx
+   RESEND_FROM=IKYS <onboarding@resend.dev>
+   ```
+4. Backend'i yeniden başlatın.
+
+**Önemli sınırlama:** Kendi domaininizi Resend'de doğrulamadığınız sürece
+`onboarding@resend.dev` adresinden **yalnızca Resend hesabınızın sahibi olduğu
+e-posta adresine** gönderim yapabilirsiniz (test/demo için yeterli). Gerçek
+kullanıcılara göndermek için Resend'de bir domain doğrulayıp `RESEND_FROM`'u
+o domain'e göre güncelleyin.
+
+`RESEND_API_KEY` tanımlıysa SMTP ayarlarına hiç bakılmaz.
+
+### Seçenek B: SMTP / Gmail Uygulama Şifresi
+
+`RESEND_API_KEY` boşsa devreye girer.
+
 1. Gmail hesabında 2 Adımlı Doğrulama'yı açın.
 2. [Google Hesap Güvenliği](https://myaccount.google.com/security) →
    "Uygulama Şifreleri" → yeni bir uygulama şifresi oluşturun.
@@ -101,7 +125,8 @@ Gmail ile aktif etmek için:
    SMTP_PASS=olusturulan_16_haneli_uygulama_sifresi
    SMTP_FROM=IKYS <hesabiniz@gmail.com>
    ```
-4. Backend'i yeniden başlatın (`npm run start:dev` veya `docker compose restart backend`).
+4. `npm i nodemailer` çalıştırın (kurulu değilse e-posta pasif kalır).
+5. Backend'i yeniden başlatın (`npm run start:dev` veya `docker compose restart backend`).
 
 `SMTP_PASS` alanına normal Gmail şifresi **çalışmaz**; yalnızca uygulama şifresi
 kullanılabilir. Bu değerleri `.env` dosyasında tutun, repoya commit etmeyin.

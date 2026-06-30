@@ -624,6 +624,14 @@ model Candidate {
   appliedAt DateTime        @default(now())
   hiredAt   DateTime? // Aday → çalışan dönüşümü
 
+  // AI destekli CV ayrıştırma
+  cvSkills          String[] @default([])
+  cvLanguages       String[] @default([])
+  cvExperienceYears Int?
+  cvSummary         String?  @db.Text
+  cvParsedAt        DateTime?
+  cvParseError      String?
+
   jobPosting JobPosting? @relation(fields: [jobPostingId], references: [id])
 }
 

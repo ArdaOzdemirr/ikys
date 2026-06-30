@@ -114,6 +114,14 @@ export class RecruitmentController {
   detail(@Param('id') id: string) { return this.service.findCandidate(id); }
 
   @ApiBearerAuth()
+  @Post('candidates/:id/parse-cv')
+  @Roles(Role.HR, Role.ADMIN)
+  @ApiOperation({ summary: 'AI ile CV\'yi yeniden ayrıştır' })
+  reparseCv(@Param('id') id: string) {
+    return this.service.reparseCv(id);
+  }
+
+  @ApiBearerAuth()
   @Patch('candidates/:id/status') @Roles(Role.HR, Role.ADMIN, Role.MANAGER)
   updateStatus(@Param('id') id: string, @Body('status') status: CandidateStatus) {
     return this.service.updateStatus(id, status);

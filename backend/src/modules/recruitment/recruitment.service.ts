@@ -1,6 +1,5 @@
 import {
   Injectable,
-  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -9,17 +8,12 @@ import { CandidateStatus, ContractType, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CvParserService } from './cv-parser.service';
 
 @Injectable()
 export class RecruitmentService {
   private readonly cvDir = path.join(process.cwd(), 'uploads', 'cv');
-  private readonly logger = new Logger('RecruitmentService');
 
-  constructor(
-    private prisma: PrismaService,
-    private cvParser: CvParserService,
-  ) {
+  constructor(private prisma: PrismaService) {
     if (!fs.existsSync(this.cvDir)) {
       fs.mkdirSync(this.cvDir, { recursive: true });
     }
@@ -56,7 +50,7 @@ export class RecruitmentService {
       throw new BadRequestException('Ad, soyad ve e-posta zorunludur');
     }
     const cvUrl = file ? this.saveCvFile(file) : undefined;
-    const candidate = await this.prisma.candidate.create({
+    return this.prisma.candidate.create({
       data: {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -68,8 +62,6 @@ export class RecruitmentService {
         cvUrl,
       },
     });
-    if (file) this.parseCvAsync(candidate.id, file.buffer, file.mimetype);
-    return candidate;
   }
 
   /** Var olan adaya CV yükler/günceller. */
@@ -79,53 +71,10 @@ export class RecruitmentService {
     });
     if (!candidate) throw new NotFoundException('Aday bulunamadı');
     const cvUrl = this.saveCvFile(file);
-    const updated = await this.prisma.candidate.update({
+    return this.prisma.candidate.update({
       where: { id: candidateId },
       data: { cvUrl },
     });
-    this.parseCvAsync(candidateId, file.buffer, file.mimetype);
-    return updated;
-  }
-
-  /** Fire-and-forget: CV'yi AI ile ayrıştırıp Candidate kaydını günceller. */
-  private parseCvAsync(candidateId: string, buffer: Buffer, mimeType: string): void {
-    this.cvParser
-      .parse(buffer, mimeType)
-      .then((parsed) =>
-        this.prisma.candidate.update({
-          where: { id: candidateId },
-          data: {
-            cvSkills: parsed.skills,
-            cvLanguages: parsed.languages,
-            cvExperienceYears: parsed.experienceYears,
-            cvSummary: parsed.summary,
-            cvParsedAt: new Date(),
-            cvParseError: null,
-          },
-        }),
-      )
-      .catch((e: any) => {
-        this.logger.warn(`CV ayrıştırma başarısız (${candidateId}): ${e?.message || e}`);
-        return this.prisma.candidate
-          .update({
-            where: { id: candidateId },
-            data: { cvParseError: e?.message || 'Bilinmeyen hata' },
-          })
-          .catch(() => undefined);
-      });
-  }
-
-  /** Manuel: var olan CV'yi yeniden ayrıştır (örn. ilk deneme başarısız olduysa). */
-  async reparseCv(candidateId: string) {
-    const candidate = await this.prisma.candidate.findUnique({
-      where: { id: candidateId },
-    });
-    if (!candidate) throw new NotFoundException('Aday bulunamadı');
-    if (!candidate.cvUrl) throw new BadRequestException('Adayın yüklenmiş bir CV\'si yok');
-    const fileName = path.basename(candidate.cvUrl);
-    const { buffer, mimeType } = this.getCvFile(fileName);
-    this.parseCvAsync(candidateId, buffer, mimeType);
-    return { message: 'CV ayrıştırma başlatıldı' };
   }
 
   getCvFile(fileName: string): { buffer: Buffer; mimeType: string } {

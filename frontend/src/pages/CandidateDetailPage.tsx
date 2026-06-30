@@ -5,7 +5,7 @@ import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import {
   Mail, Phone, Briefcase, FileText, MessageSquare,
-  UserCheck, Star, ArrowLeft, Plus, Sparkles, RefreshCw,
+  UserCheck, Star, ArrowLeft, Plus,
 } from 'lucide-react';
 
 const STATUS_OPTIONS = [
@@ -80,15 +80,6 @@ export default function CandidateDetailPage() {
       qc.invalidateQueries({ queryKey: ['candidate', id] });
       setShowNoteForm(false);
       setNoteForm({ interviewer: '', notes: '', rating: 5 });
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
-  });
-
-  const reparseCv = useMutation({
-    mutationFn: () => api.post(`/recruitment/candidates/${id}/parse-cv`, {}),
-    onSuccess: () => {
-      toast.success('CV ayrıştırma başlatıldı, birkaç saniye içinde tamamlanır');
-      setTimeout(() => qc.invalidateQueries({ queryKey: ['candidate', id] }), 6000);
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
   });
@@ -197,75 +188,6 @@ export default function CandidateDetailPage() {
           )}
         </div>
       </div>
-
-      {/* AI Destekli CV Analizi */}
-      {candidate.cvUrl && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Sparkles size={18} className="text-brand-600" />
-              AI Destekli CV Analizi
-            </h3>
-            <button
-              onClick={() => reparseCv.mutate()}
-              disabled={reparseCv.isPending}
-              className="btn-secondary text-sm flex items-center gap-1 disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={reparseCv.isPending ? 'animate-spin' : ''} />
-              {candidate.cvParsedAt ? 'Yeniden Ayrıştır' : 'CV\'yi Ayrıştır'}
-            </button>
-          </div>
-
-          {candidate.cvParseError && (
-            <p className="text-sm text-red-600 bg-red-50 rounded p-2 mb-2">
-              Ayrıştırma hatası: {candidate.cvParseError}
-            </p>
-          )}
-
-          {candidate.cvParsedAt ? (
-            <div className="space-y-3 text-sm">
-              {candidate.cvSummary && (
-                <p className="text-gray-700">{candidate.cvSummary}</p>
-              )}
-              {typeof candidate.cvExperienceYears === 'number' && (
-                <p>
-                  <span className="font-medium">Tahmini Deneyim:</span>{' '}
-                  {candidate.cvExperienceYears} yıl
-                </p>
-              )}
-              {candidate.cvSkills?.length > 0 && (
-                <div>
-                  <p className="font-medium mb-1">Yetkinlikler</p>
-                  <div className="flex flex-wrap gap-1">
-                    {candidate.cvSkills.map((s: string) => (
-                      <span key={s} className="badge bg-brand-50 text-brand-700">{s}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {candidate.cvLanguages?.length > 0 && (
-                <div>
-                  <p className="font-medium mb-1">Diller</p>
-                  <div className="flex flex-wrap gap-1">
-                    {candidate.cvLanguages.map((l: string) => (
-                      <span key={l} className="badge bg-gray-100 text-gray-700">{l}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <p className="text-xs text-gray-400">
-                Son ayrıştırma: {new Date(candidate.cvParsedAt).toLocaleString('tr-TR')}
-              </p>
-            </div>
-          ) : (
-            !candidate.cvParseError && (
-              <p className="text-gray-500 text-sm">
-                Bu CV henüz AI ile ayrıştırılmadı.
-              </p>
-            )
-          )}
-        </div>
-      )}
 
       {/* Durum güncelleme */}
       {candidate.status !== 'HIRED' && (

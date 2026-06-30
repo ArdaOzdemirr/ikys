@@ -25,7 +25,7 @@ uygulamadan oluşan bir sistem.
 | `attendance` | Devam takibi, QR ile check-in/check-out |
 | `leave` | İzin talepleri, onay zinciri, ilk yıl kuralı, dinamik izin kategorileri |
 | `payroll` | Bordro hesaplama (SGK, işsizlik sigortası, gelir vergisi, damga vergisi) |
-| `recruitment` | İlan yayınlama, başvuru/aday takibi, AI destekli CV ayrıştırma (Claude API) |
+| `recruitment` | İlan yayınlama, başvuru/aday takibi |
 | `documents` | Belge yükleme/saklama (local veya S3 uyumlu depolama) |
 | `kvkk` | KVKK kapsamında veri erişim/işleme loglama |
 | `notifications` | Uygulama içi bildirim, e-posta (SMTP) ve push (FCM) gönderimi |
@@ -130,22 +130,6 @@ o domain'e göre güncelleyin.
 
 `SMTP_PASS` alanına normal Gmail şifresi **çalışmaz**; yalnızca uygulama şifresi
 kullanılabilir. Bu değerleri `.env` dosyasında tutun, repoya commit etmeyin.
-
-## AI Destekli CV Ayrıştırma
-
-CV yüklendiğinde (PDF, JPG veya PNG), Claude API kullanılarak otomatik olarak
-yetkinlikler, diller, tahmini deneyim yılı ve kısa bir özet çıkarılır; sonuç
-aday detay sayfasında görüntülenir. DOC/DOCX dosyaları desteklenmez.
-
-1. [console.anthropic.com](https://console.anthropic.com/) → API Keys → yeni anahtar oluşturun.
-2. `backend/.env` dosyasında doldurun:
-   ```env
-   ANTHROPIC_API_KEY=sk-ant-xxx
-   ```
-3. Backend'i yeniden başlatın.
-
-`ANTHROPIC_API_KEY` boşsa özellik sessizce pasif kalır; CV yükleme normal
-şekilde çalışmaya devam eder, sadece ayrıştırma atlanır.
 
 ## Push Bildirimleri (Firebase)
 

@@ -49,14 +49,14 @@ export class NotificationsController {
   }
 
   @Get('recipients')
-  @ApiOperation({ summary: 'Mesaj gönderebileceğim kişiler (tüm aktif personel)' })
+  @ApiOperation({ summary: 'Mesaj gönderebileceğim kişiler (kendi seviyem ve altım, üst hiyerarşi hariç)' })
   async recipients(@CurrentUser('userId') userId: string) {
     const p = await this.me(userId);
     return this.service.messageableRecipients(p.id);
   }
 
   @Post('message')
-  @ApiOperation({ summary: 'Herhangi bir personele serbest mesaj gönder' })
+  @ApiOperation({ summary: 'Aynı seviyedeki veya alt kademedeki personele mesaj gönder' })
   async send(
     @CurrentUser('userId') userId: string,
     @Body() dto: SendMessageDto,

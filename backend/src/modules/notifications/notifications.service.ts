@@ -126,9 +126,26 @@ export class NotificationsService {
     return { success: true };
   }
 
+  /** managerId zincirini yukarı doğru gezip bu personelin tüm üst amirlerinin id'lerini döner. */
+  private async getSuperiorIds(personnelId: string): Promise<Set<string>> {
+    const superiors = new Set<string>();
+    let currentId: string | null = personnelId;
+    while (currentId) {
+      const current: { managerId: string | null } | null =
+        await this.prisma.personnel.findUnique({
+          where: { id: currentId },
+          select: { managerId: true },
+        });
+      if (!current?.managerId || superiors.has(current.managerId)) break;
+      superiors.add(current.managerId);
+      currentId = current.managerId;
+    }
+    return superiors;
+  }
+
   /**
-   * Bu personelin mesaj gönderebileceği kişiler: hiyerarşi kısıtı yok,
-   * kendisi hariç tüm aktif personel seçilebilir (tek tek veya toplu).
+   * Bu personelin mesaj gönderebileceği kişiler: kendisi ve üst hiyerarşisindeki
+   * (yöneticisi, yöneticisinin yöneticisi, ...) kişiler hariç, tüm aktif personel.
    */
   async messageableRecipients(personnelId: string) {
     const me = await this.prisma.personnel.findUnique({
@@ -137,10 +154,12 @@ export class NotificationsService {
     });
     if (!me) throw new NotFoundException('Personel kaydı bulunamadı');
 
+    const superiorIds = await this.getSuperiorIds(personnelId);
+
     const people = await this.prisma.personnel.findMany({
       where: {
         status: 'ACTIVE',
-        id: { not: me.id },
+        id: { notIn: [me.id, ...superiorIds] },
       },
       select: {
         id: true,
@@ -161,7 +180,10 @@ export class NotificationsService {
     }));
   }
 
-  /** Serbest mesaj gönderir; herkes herkese yazabilir, kısıtlama yok. */
+  /**
+   * Mesaj gönderir. Kısıtlama: kendi üst hiyerarşisindeki (yöneticisi ve
+   * üzeri) kimseye mesaj gönderemez; akranlarına ve altındakilere serbest.
+   */
   async sendMessage(
     senderId: string,
     recipientIds: string[],
@@ -178,6 +200,11 @@ export class NotificationsService {
     });
     if (validCount !== targets.length) {
       throw new ForbiddenException('Geçersiz alıcı listesi');
+    }
+
+    const superiorIds = await this.getSuperiorIds(senderId);
+    if (targets.some((id) => superiorIds.has(id))) {
+      throw new ForbiddenException('Üst hiyerarşinizdeki birine mesaj gönderemezsiniz');
     }
 
     const sender = await this.prisma.personnel.findUnique({

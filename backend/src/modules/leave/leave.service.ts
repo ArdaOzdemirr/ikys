@@ -652,15 +652,15 @@ export class LeaveService {
   }
 
   /**
-   * Onayını bekleyen iptal talepleri. HR/Admin tümünü görür; diğerleri
-   * yalnızca kendilerine atanmış (cancelApproverId) talepleri görür.
+   * Onayını bekleyen iptal talepleri. Sıralı akış: yalnızca o an sırada
+   * (cancelApproverId) olan kişi görür — rol ne olursa olsun (HR/ADMIN dahil),
+   * kendine devredilmemiş bir talebi göremez.
    */
-  pendingCancellations(personnelId: string, role: string) {
-    const seesAll = ['HR', 'ADMIN'].includes(role);
+  pendingCancellations(personnelId: string, _role: string) {
     return this.prisma.leaveRequest.findMany({
       where: {
         status: LeaveStatus.CANCEL_REQUESTED,
-        ...(seesAll ? {} : { cancelApproverId: personnelId }),
+        cancelApproverId: personnelId,
       },
       include: {
         personnel: {

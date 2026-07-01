@@ -12,6 +12,7 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "reset:real-accounts": "ts-node prisma/reset-real-accounts.ts",
     "add:hr": "ts-node prisma/add-hr-account.ts",
+    "assign:shift": "ts-node prisma/assign-standard-shift.ts",
     "prisma:studio": "prisma studio",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest"

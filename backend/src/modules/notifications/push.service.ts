@@ -31,19 +31,27 @@ export class PushService {
     if (this.tried) return this.admin;
     this.tried = true;
     try {
-      const credPath =
-        process.env.FIREBASE_CREDENTIALS ||
-        path.join(process.cwd(), 'firebase-service-account.json');
-      if (!fs.existsSync(credPath)) {
-        this.logger.log('Firebase kimlik dosyası yok; push pasif.');
-        return null;
+      const credEnv = process.env.FIREBASE_CREDENTIALS;
+      let serviceAccount: any;
+      if (credEnv) {
+        // FIREBASE_CREDENTIALS ya JSON içeriğinin kendisi (Railway'de env
+        // değişkeni olarak) ya da bir dosya yoludur (yerelde).
+        serviceAccount = credEnv.trim().startsWith('{')
+          ? JSON.parse(credEnv)
+          : JSON.parse(fs.readFileSync(credEnv, 'utf8'));
+      } else {
+        const defaultPath = path.join(process.cwd(), 'firebase-service-account.json');
+        if (!fs.existsSync(defaultPath)) {
+          this.logger.log('Firebase kimlik dosyası yok; push pasif.');
+          return null;
+        }
+        serviceAccount = JSON.parse(fs.readFileSync(defaultPath, 'utf8'));
       }
       const moduleName = 'firebase-admin';
       // Modül adını değişkene alıp require ediyoruz: paket kurulu değilse TS derlemede
       // modül çözümlemesi yapmaz, yalnızca runtime'da hata fırlatır (yukarıda yakalanır).
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const admin = require(moduleName);
-      const serviceAccount = JSON.parse(fs.readFileSync(credPath, 'utf8'));
       if (!admin.apps.length) {
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),

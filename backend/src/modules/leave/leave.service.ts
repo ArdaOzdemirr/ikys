@@ -10,6 +10,7 @@ import {
   LeaveStatus,
   LeaveType,
   NotificationType,
+  Role,
 } from '@prisma/client';
 import dayjs from 'dayjs';
 import { CreateLeaveRequestDto, ApproveLeaveDto } from './leave.dto';
@@ -119,6 +120,12 @@ export class LeaveService {
     if (approvers.length === 0) {
       const fb = await this.fallbackApprover(personnelId);
       approvers = fb ? [fb] : [];
+    }
+
+    // Genel kural: yönetici zinciri onayladıktan sonra son adım olarak İK onaylar.
+    const hrId = await this.finalHrApprover(personnelId);
+    if (hrId && !approvers.includes(hrId)) {
+      approvers = [...approvers, hrId];
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -826,6 +833,23 @@ export class LeaveService {
         status: 'ACTIVE',
         id: { not: personnelId },
         user: { role: { in: ['HR', 'ADMIN'] } },
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return hr?.id ?? null;
+  }
+
+  /**
+   * Genel kural: yönetici zinciri onayladıktan sonra son adım İK'dır.
+   * İK personelin kendisiyse veya aktif başka bir İK yoksa adım eklenmez.
+   */
+  private async finalHrApprover(personnelId: string): Promise<string | null> {
+    const hr = await this.prisma.personnel.findFirst({
+      where: {
+        status: 'ACTIVE',
+        id: { not: personnelId },
+        user: { role: Role.HR },
       },
       select: { id: true },
       orderBy: { createdAt: 'asc' },

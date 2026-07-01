@@ -106,14 +106,6 @@ export default function LoginPage() {
               {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center">
-              Demo hesaplar: <strong>admin@firma.com</strong> / Admin123!<br />
-              <strong>ik@firma.com</strong> / Hr123456! &nbsp;|&nbsp;
-              <strong>yazilim@firma.com</strong> / yazilim123!
-            </p>
-          </div>
         </div>
 
         <p className="text-center text-xs text-gray-500 mt-6">

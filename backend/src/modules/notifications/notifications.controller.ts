@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
-import { SendMessageDto, BroadcastDto, DeviceTokenDto } from './notifications.dto';
+import { SendMessageDto, ReplyMessageDto, BroadcastDto, DeviceTokenDto } from './notifications.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../config/prisma.service';
 
@@ -63,6 +63,17 @@ export class NotificationsController {
   ) {
     const p = await this.me(userId);
     return this.service.sendMessage(p.id, dto.recipientIds, dto.title, dto.body, dto.priority);
+  }
+
+  @Post(':id/reply')
+  @ApiOperation({ summary: 'Alınan bir mesaja yanıt (üst hiyerarşi kısıtı uygulanmaz)' })
+  async reply(
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+    @Body() dto: ReplyMessageDto,
+  ) {
+    const p = await this.me(userId);
+    return this.service.replyToMessage(p.id, id, dto.title, dto.body, dto.priority);
   }
 
   @Post('broadcast')

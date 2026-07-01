@@ -38,6 +38,25 @@ export class SendMessageDto {
   priority?: NotificationPriority;
 }
 
+/** Alınan bir mesaja yanıt: hiyerarşi kısıtı olmadan gönderene geri yazılabilir. */
+export class ReplyMessageDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(150)
+  title!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  body?: string;
+
+  @ApiProperty({ required: false, enum: NotificationPriority })
+  @IsOptional()
+  @IsEnum(NotificationPriority)
+  priority?: NotificationPriority;
+}
+
 export class BroadcastDto {
   @ApiProperty()
   @IsString()

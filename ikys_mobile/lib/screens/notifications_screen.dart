@@ -100,6 +100,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         builder: (_) => ComposeMessageScreen(
           replyToId: n.senderId,
           replyToName: n.senderName,
+          replyToNotificationId: n.id,
         ),
       ),
     );
@@ -284,7 +285,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 class ComposeMessageScreen extends StatefulWidget {
   final String? replyToId;
   final String? replyToName;
-  const ComposeMessageScreen({super.key, this.replyToId, this.replyToName});
+  final String? replyToNotificationId;
+  const ComposeMessageScreen({
+    super.key,
+    this.replyToId,
+    this.replyToName,
+    this.replyToNotificationId,
+  });
 
   @override
   State<ComposeMessageScreen> createState() => _ComposeMessageScreenState();
@@ -322,13 +329,20 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
 
   Future<void> _send() async {
     if (_title.text.trim().isEmpty) return;
-    if (!_broadcast && _selected.isEmpty) return;
+    if (!_broadcast && widget.replyToNotificationId == null && _selected.isEmpty) return;
     setState(() => _sending = true);
     try {
       final int n;
       if (_broadcast) {
         n = await NotificationService.broadcast(
             _title.text.trim(), _body.text.trim(), priority: _priority);
+      } else if (widget.replyToNotificationId != null) {
+        n = await NotificationService.reply(
+          notificationId: widget.replyToNotificationId!,
+          title: _title.text.trim(),
+          body: _body.text.trim(),
+          priority: _priority,
+        );
       } else {
         n = await NotificationService.sendMessage(
           recipientIds: _selected.toList(),
@@ -363,7 +377,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
                 .contains(q))
             .toList();
     final canSend = _title.text.trim().isNotEmpty &&
-        (_broadcast || _selected.isNotEmpty);
+        (_broadcast || widget.replyToNotificationId != null || _selected.isNotEmpty);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mesaj Gönder')),
@@ -407,7 +421,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
                       ],
                     ),
                   ),
-                if (!_broadcast) ...[
+                if (!_broadcast && widget.replyToNotificationId == null) ...[
                   const Text(
                     'İstediğiniz herhangi bir çalışana mesaj gönderebilirsiniz.',
                     style: TextStyle(color: Colors.grey, fontSize: 13),

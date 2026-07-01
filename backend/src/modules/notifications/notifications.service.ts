@@ -126,6 +126,51 @@ export class NotificationsService {
     return { success: true };
   }
 
+  /**
+   * Alınan bir mesaja yanıt: hiyerarşi kısıtı uygulanmaz. Aldığın mesajın
+   * göndericisine, o kişi üst hiyerarşinizde olsa bile cevap verebilirsiniz.
+   */
+  async replyToMessage(
+    personnelId: string,
+    notificationId: string,
+    title: string,
+    body?: string,
+    priority: NotificationPriority = NotificationPriority.NORMAL,
+  ) {
+    const original = await this.prisma.notification.findUnique({
+      where: { id: notificationId },
+    });
+    if (!original) throw new NotFoundException('Bildirim bulunamadı');
+    if (original.recipientId !== personnelId) {
+      throw new ForbiddenException('Bu bildirim size ait değil');
+    }
+    if (!original.senderId) {
+      throw new ForbiddenException('Bu bildirimin bir göndericisi yok, yanıtlanamaz');
+    }
+
+    const sender = await this.prisma.personnel.findUnique({
+      where: { id: personnelId },
+      select: { firstName: true, lastName: true },
+    });
+    const senderName = sender ? `${sender.firstName} ${sender.lastName}` : 'Bir çalışan';
+
+    const created = await this.prisma.notification.create({
+      data: {
+        recipientId: original.senderId,
+        senderId: personnelId,
+        type: NotificationType.MESSAGE,
+        priority,
+        title,
+        body: body ?? null,
+      },
+    });
+
+    void this.emailPersonnel([original.senderId], title, body);
+    void this.push.sendToPersonnel([original.senderId], { title, body, priority });
+
+    return { sent: 1, from: senderName, notification: created };
+  }
+
   /** managerId zincirini yukarı doğru gezip bu personelin tüm üst amirlerinin id'lerini döner. */
   private async getSuperiorIds(personnelId: string): Promise<Set<string>> {
     const superiors = new Set<string>();

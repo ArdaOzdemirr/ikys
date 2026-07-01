@@ -140,6 +140,20 @@ class NotificationService {
     });
     return (res.data['sent'] as num).toInt();
   }
+
+  static Future<int> reply({
+    required String notificationId,
+    required String title,
+    String? body,
+    String priority = 'NORMAL',
+  }) async {
+    final res = await ApiClient.instance.dio.post('/notifications/$notificationId/reply', data: {
+      'title': title,
+      if (body != null && body.isNotEmpty) 'body': body,
+      'priority': priority,
+    });
+    return (res.data['sent'] as num).toInt();
+  }
 }
 
 class ApprovalService {

@@ -26,7 +26,7 @@ interface Recipient {
   department?: string | null;
 }
 
-type ReplyTo = { id: string; name: string } | null;
+type ReplyTo = { id: string; name: string; notificationId: string } | null;
 
 const typeMeta: Record<NotificationItem['type'], { icon: any; color: string; bg: string }> = {
   LEAVE_APPROVAL_PENDING: { icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
@@ -81,7 +81,7 @@ export default function NotificationsPage() {
 
   const startReply = (n: NotificationItem) => {
     if (!n.sender) return;
-    setReplyTo({ id: n.sender.id, name: `${n.sender.firstName} ${n.sender.lastName}` });
+    setReplyTo({ id: n.sender.id, name: `${n.sender.firstName} ${n.sender.lastName}`, notificationId: n.id });
     setTab('compose');
   };
 
@@ -232,15 +232,23 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
   });
 
   const send = useMutation({
-    mutationFn: () =>
-      broadcast
+    mutationFn: () => {
+      if (replyTo && !broadcast) {
+        return api.post(`/notifications/${replyTo.notificationId}/reply`, {
+          title,
+          body: body || undefined,
+          priority,
+        });
+      }
+      return broadcast
         ? api.post('/notifications/broadcast', { title, body: body || undefined, priority })
         : api.post('/notifications/message', {
             recipientIds: [...selected],
             title,
             body: body || undefined,
             priority,
-          }),
+          });
+    },
     onSuccess: (res: any) => {
       toast.success(`${res.sent} kişiye gönderildi`);
       setSelected(new Set());
@@ -268,7 +276,7 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
       .includes(q);
   });
   const canSend =
-    title.trim().length > 0 && (broadcast || selected.size > 0);
+    title.trim().length > 0 && (broadcast || (replyTo ? true : selected.size > 0));
 
   return (
     <div className="space-y-4">
@@ -290,7 +298,7 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
           </div>
         )}
 
-        {!broadcast && (
+        {!broadcast && !replyTo && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Alıcılar ({selected.size} seçili)

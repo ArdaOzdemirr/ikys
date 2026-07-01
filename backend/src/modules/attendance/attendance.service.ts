@@ -10,17 +10,26 @@ export class AttendanceService {
   constructor(private prisma: PrismaService) {}
 
   async generateQrCode(branchId?: string) {
+    // Sabit QR: süresi yok denecek kadar uzak bir tarih (rotasyon yok)
+    const farFuture = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000);
+
     const existing = await this.prisma.qrCode.findFirst({
       where: { branchId: branchId ?? null },
       orderBy: { createdAt: 'desc' },
     });
-    if (existing) return existing;
+    if (existing) {
+      if (existing.validUntil < new Date()) {
+        return this.prisma.qrCode.update({
+          where: { id: existing.id },
+          data: { validUntil: farFuture },
+        });
+      }
+      return existing;
+    }
 
     const code = uuid();
-    // Sabit QR: süresi yok denecek kadar uzak bir tarih (rotasyon yok)
-    const validUntil = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000);
     return this.prisma.qrCode.create({
-      data: { code, branchId, validUntil },
+      data: { code, branchId, validUntil: farFuture },
     });
   }
 

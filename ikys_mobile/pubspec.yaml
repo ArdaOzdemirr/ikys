@@ -18,7 +18,7 @@ dependencies:
   go_router: ^13.2.0            # Yönlendirme (expo-router karşılığı)
   mobile_scanner: ^4.0.1        # QR okuma (expo-camera karşılığı)
   geolocator: ^11.0.0           # Konum (expo-location karşılığı)
-  intl: ^0.19.0                 # Tarih biçimleme
+  intl: ^0.20.2                 # Tarih biçimleme
   flutter_local_notifications: ^17.2.3  # Yerel heads-up bildirim (önemli/çok önemli)
   firebase_core: ^3.6.0         # Firebase çekirdek
   firebase_messaging: ^15.1.3   # FCM push (uygulama kapalıyken bildirim)

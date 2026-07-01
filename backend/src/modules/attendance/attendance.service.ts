@@ -93,6 +93,14 @@ export class AttendanceService {
   }
 
   async checkOut(personnelId: string, dto: CheckOutDto) {
+    if (dto.method === AttendanceMethod.QR_CODE) {
+      if (!dto.qrCode) throw new BadRequestException('QR kodu gerekli');
+      const qr = await this.prisma.qrCode.findUnique({ where: { code: dto.qrCode } });
+      if (!qr || qr.validUntil < new Date()) {
+        throw new BadRequestException('QR kodu geçersiz veya süresi dolmuş');
+      }
+    }
+
     const today = (() => {
       const now = new Date();
       return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));

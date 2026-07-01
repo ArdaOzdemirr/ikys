@@ -62,11 +62,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
-  Future<void> _startScan() async {
+  Future<String?> _scanCode() async {
     final raw = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => const _ScannerPage()),
     );
-    if (raw == null) return;
+    if (raw == null) return null;
 
     // Web paneli QR'a JSON gömüyor: {"type":"IKYS_ATTENDANCE","code":"...",...}
     String code = raw;
@@ -74,6 +74,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       final obj = jsonDecode(raw);
       if (obj is Map && obj['code'] != null) code = obj['code'];
     } catch (_) {}
+    return code;
+  }
+
+  Future<void> _startScan() async {
+    final code = await _scanCode();
+    if (code == null) return;
 
     setState(() => _busy = true);
     try {
@@ -93,10 +99,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _checkOut() async {
+    final code = await _scanCode();
+    if (code == null) return;
+
     setState(() => _busy = true);
     try {
       final c = await _coords();
-      await AttendanceService.checkOut(latitude: c['latitude'], longitude: c['longitude']);
+      await AttendanceService.checkOut(
+        qrCode: code,
+        latitude: c['latitude'],
+        longitude: c['longitude'],
+      );
       _snack('Çıkış kaydedildi.');
       await _load();
     } catch (e) {
@@ -166,7 +179,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           else if (!hasIn)
             _actionButton('QR Okut · Giriş Yap', const Color(0xFF16A34A), _startScan)
           else if (!hasOut)
-            _actionButton('Çıkış Yap', const Color(0xFFDC2626), _checkOut)
+            _actionButton('QR Okut · Çıkış Yap', const Color(0xFFDC2626), _checkOut)
           else
             Container(
               padding: const EdgeInsets.all(16),

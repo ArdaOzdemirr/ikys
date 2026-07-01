@@ -24,6 +24,16 @@ export class CheckInDto {
 }
 
 export class CheckOutDto {
+  @ApiProperty({ enum: AttendanceMethod, required: false })
+  @IsOptional()
+  @IsEnum(AttendanceMethod)
+  method?: AttendanceMethod;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  qrCode?: string;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsNumber()

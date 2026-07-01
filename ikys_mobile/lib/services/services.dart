@@ -33,8 +33,10 @@ class AttendanceService {
     });
   }
 
-  static Future<void> checkOut({double? latitude, double? longitude}) async {
+  static Future<void> checkOut({required String qrCode, double? latitude, double? longitude}) async {
     await ApiClient.instance.dio.post('/attendance/check-out', data: {
+      'method': 'QR_CODE',
+      'qrCode': qrCode,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
     });

@@ -40,6 +40,10 @@ export class LeaveService {
     if (end < start) {
       throw new BadRequestException('Bitiş tarihi başlangıçtan önce olamaz');
     }
+    const today = dayjs().startOf('day');
+    if (dayjs(start).isBefore(today)) {
+      throw new BadRequestException('Geçmiş bir tarih için izin talebi oluşturulamaz');
+    }
 
     const personnel = await this.prisma.personnel.findUnique({
       where: { id: personnelId },

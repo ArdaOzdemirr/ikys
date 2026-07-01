@@ -10,15 +10,18 @@ export class AttendanceService {
   constructor(private prisma: PrismaService) {}
 
   async generateQrCode(branchId?: string) {
+    const existing = await this.prisma.qrCode.findFirst({
+      where: { branchId: branchId ?? null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) return existing;
+
     const code = uuid();
-    const validUntil = new Date(Date.now() + 30 * 1000);
-    await this.prisma.qrCode.create({
+    // Sabit QR: süresi yok denecek kadar uzak bir tarih (rotasyon yok)
+    const validUntil = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000);
+    return this.prisma.qrCode.create({
       data: { code, branchId, validUntil },
     });
-    await this.prisma.qrCode.deleteMany({
-      where: { validUntil: { lt: new Date() } },
-    });
-    return { code, validUntil };
   }
 
   async checkIn(personnelId: string, dto: CheckInDto) {

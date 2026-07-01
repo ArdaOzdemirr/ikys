@@ -333,7 +333,7 @@ model Attendance {
 
 model QrCode {
   id         String   @id @default(uuid())
-  code       String   @unique // Dinamik QR (her N saniyede yenilenir)
+  code       String   @unique // Sabit QR (şube başına tek kod, rotasyon yok)
   branchId   String?
   validUntil DateTime
   createdAt  DateTime @default(now())

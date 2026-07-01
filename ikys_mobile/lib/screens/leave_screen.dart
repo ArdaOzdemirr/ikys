@@ -324,11 +324,16 @@ class _NewLeaveSheetState extends State<_NewLeaveSheet> {
   }
 
   Future<void> _pickDate(bool isStart) async {
+    final today = DateTime.now();
+    final minDate = isStart ? today : _start;
     final picked = await showDatePicker(
       context: context,
-      initialDate: isStart ? _start : _end,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 730)),
+      initialDate: isStart
+          ? (_start.isBefore(today) ? today : _start)
+          : (_end.isBefore(minDate) ? minDate : _end),
+      firstDate: minDate,
+      lastDate: today.add(const Duration(days: 730)),
+      locale: const Locale('tr', 'TR'),
     );
     if (picked == null) return;
     setState(() {

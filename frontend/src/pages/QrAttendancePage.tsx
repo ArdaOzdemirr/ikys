@@ -9,7 +9,6 @@ export default function QrAttendancePage() {
   const { hasRole } = useAuth();
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
-  const [countdown, setCountdown] = useState(30);
 
   // Saat
   useEffect(() => {
@@ -17,25 +16,15 @@ export default function QrAttendancePage() {
     return () => clearInterval(t);
   }, []);
 
-  // QR kod - her 25 saniyede bir yenile (30sn validity'den önce)
+  // QR kod - sabit, sadece bir kere çekilir
   const { data: qrData, refetch } = useQuery({
     queryKey: ['qr-code'],
     queryFn: () => api.get('/attendance/qr-code'),
-    refetchInterval: 25 * 1000,
     enabled: hasRole('ADMIN'),
   });
 
-  // Geri sayım
-  useEffect(() => {
-    const t = setInterval(() => {
-      setCountdown((c) => (c > 0 ? c - 1 : 25));
-    }, 1000);
-    return () => clearInterval(t);
-  }, []);
-
   useEffect(() => {
     if (qrData) {
-      setCountdown(25);
       // QR kod görüntüsü oluştur (içeriği: code string'i, frontend bunu okuyup
       // /attendance/check-in endpoint'ine gönderecek)
       const payload = JSON.stringify({
@@ -64,7 +53,7 @@ export default function QrAttendancePage() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            🔐 Dinamik QR Mesai Sistemi
+            🔐 QR Mesai Sistemi
           </h1>
           <p className="text-gray-600">
             Çalışanlar telefonlarıyla QR kodu okutarak mesaiye giriş yapabilir
@@ -101,12 +90,6 @@ export default function QrAttendancePage() {
               <div>
                 <div className="bg-white p-4 rounded-xl inline-block shadow-lg">
                   <img src={qrImage} alt="QR Kod" className="w-full max-w-xs mx-auto" />
-                </div>
-                <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-                  <RefreshCw size={14} className={countdown < 5 ? 'animate-spin text-red-500' : 'text-gray-400'} />
-                  <span className={`font-mono ${countdown < 5 ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-                    {countdown} saniye sonra yenilenir
-                  </span>
                 </div>
                 <button
                   onClick={() => refetch()}
@@ -162,8 +145,8 @@ export default function QrAttendancePage() {
               <div className="flex items-start gap-2">
                 <RefreshCw size={14} className="mt-0.5 text-brand-600 flex-shrink-0" />
                 <p>
-                  <strong>Dinamik QR:</strong> QR kod her 30 saniyede yenilenir,
-                  fotoğraflanıp kötüye kullanılamaz
+                  <strong>Sabit QR:</strong> Bu şubeye ait QR kod değişmez,
+                  yazdırıp asabilirsiniz
                 </p>
               </div>
             </div>

@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.6
   dio: ^5.4.0                    # HTTP (axios karşılığı)
   flutter_secure_storage: ^9.0.0 # Token saklama (expo-secure-store karşılığı)

@@ -124,6 +124,7 @@ export default function LeavePage() {
               <input
                 type="date"
                 required
+                min={new Date().toISOString().split('T')[0]}
                 value={form.startDate}
                 onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                 className="input"
@@ -134,6 +135,7 @@ export default function LeavePage() {
               <input
                 type="date"
                 required
+                min={form.startDate || new Date().toISOString().split('T')[0]}
                 value={form.endDate}
                 onChange={(e) => setForm({ ...form, endDate: e.target.value })}
                 className="input"

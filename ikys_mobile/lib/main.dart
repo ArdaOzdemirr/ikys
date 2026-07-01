@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'services/api_client.dart';
@@ -16,6 +19,8 @@ Future<void> _firebaseBgHandler(RemoteMessage message) async {}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('tr_TR');
+  Intl.defaultLocale = 'tr_TR';
   try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseBgHandler);
@@ -56,6 +61,13 @@ class _IkysAppState extends State<IkysApp> {
       child: MaterialApp.router(
         title: 'İKYS',
         debugShowCheckedModeBanner: false,
+        locale: const Locale('tr', 'TR'),
+        supportedLocales: const [Locale('tr', 'TR')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         theme: ThemeData(
           useMaterial3: true,
           colorSchemeSeed: const Color(0xFF2563EB),

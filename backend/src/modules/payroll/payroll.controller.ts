@@ -131,20 +131,20 @@ export class PayrollController {
   }
 
   @Get('expenses/pending')
-  @Roles(Role.MANAGER, Role.HR, Role.ACCOUNTING, Role.ADMIN)
+  @Roles(Role.HR, Role.ACCOUNTING)
   pendingExpenses() {
     return this.service.pendingExpenses();
   }
 
   @Get('expenses/approved-unpaid')
-  @Roles(Role.ACCOUNTING, Role.ADMIN)
+  @Roles(Role.HR, Role.ACCOUNTING)
   @ApiOperation({ summary: 'Muhasebe: onaylanmış, ödemesi bekleyen talepler' })
   approvedUnpaidExpenses() {
     return this.service.approvedUnpaidExpenses();
   }
 
   @Patch('expenses/:id/approve')
-  @Roles(Role.MANAGER, Role.HR, Role.ACCOUNTING, Role.ADMIN)
+  @Roles(Role.HR, Role.ACCOUNTING)
   async approveExpense(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
@@ -155,7 +155,7 @@ export class PayrollController {
   }
 
   @Patch('expenses/:id/pay')
-  @Roles(Role.ACCOUNTING, Role.ADMIN)
+  @Roles(Role.HR, Role.ACCOUNTING)
   @ApiOperation({ summary: 'Muhasebe: onaylanmış talebi öder' })
   async payExpense(@Param('id') id: string, @CurrentUser('userId') userId: string) {
     const personnel = await this.requirePersonnel(userId);

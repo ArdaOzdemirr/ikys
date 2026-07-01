@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
   { to: '/payroll', label: 'Bordrolarım', icon: Wallet },
   { to: '/payroll/management', label: 'Bordro Yönetimi', icon: FileSpreadsheet, roles: ['HR', 'ADMIN', 'ACCOUNTING'] },
   { to: '/expenses', label: 'Masraflarım', icon: Receipt },
-  { to: '/expenses/approvals', label: 'Masraf Onayları', icon: CheckSquare, roles: ['MANAGER', 'HR', 'ACCOUNTING', 'ADMIN'] },
+  { to: '/expenses/approvals', label: 'Masraf Onayları', icon: CheckSquare, roles: ['HR', 'ACCOUNTING'] },
   { to: '/recruitment', label: 'İşe Alım', icon: Briefcase, roles: ['HR', 'ADMIN', 'MANAGER'] },
   { to: '/recruitment/postings', label: 'İş İlanları', icon: FilePlus, roles: ['HR', 'ADMIN'] },
   { to: '/notifications', label: 'Bildirimler', icon: Bell },

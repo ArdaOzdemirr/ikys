@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 export default function ExpenseApprovalPage() {
   const qc = useQueryClient();
   const { hasRole } = useAuth();
-  const isAccounting = hasRole('ACCOUNTING', 'ADMIN');
+  const isAccounting = hasRole('ACCOUNTING', 'HR');
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 

@@ -111,7 +111,7 @@ export default function LoginPage() {
             <p className="text-xs text-gray-500 text-center">
               Demo hesaplar: <strong>admin@firma.com</strong> / Admin123!<br />
               <strong>ik@firma.com</strong> / Hr123456! &nbsp;|&nbsp;
-              <strong>mehmet@firma.com</strong> / Emp123456!
+              <strong>yazilim@firma.com</strong> / yazilim123!
             </p>
           </div>
         </div>

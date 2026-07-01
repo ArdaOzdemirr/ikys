@@ -241,7 +241,7 @@ export class PayrollService {
       select: { firstName: true, lastName: true },
     });
     const approvers = await this.prisma.personnel.findMany({
-      where: { status: 'ACTIVE', user: { role: { in: [Role.ACCOUNTING, Role.ADMIN] } } },
+      where: { status: 'ACTIVE', user: { role: Role.HR } },
       select: { id: true },
     });
     const title = `${requester?.firstName} ${requester?.lastName} - ${dto.amount} ${dto.currency || 'TRY'} talebi`;

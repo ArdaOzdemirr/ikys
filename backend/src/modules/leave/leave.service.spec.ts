@@ -148,7 +148,8 @@ describe('LeaveService - izin iptal onay akışı', () => {
     let balanceUpdated = false;
     const prisma = {
       personnel: {
-        findFirst: jest.fn().mockResolvedValue(null), // fallbackApprover: İK/Admin yok
+        findFirst: jest.fn().mockResolvedValue(null), // fallbackApprover/finalHrApprover: İK/Admin yok
+        findUnique: jest.fn().mockResolvedValue({ user: { role: 'MANAGER' } }), // decideCancellation: onaylayanın rolü
       },
       leaveRequest: {
         findUnique: jest.fn().mockResolvedValue(leaveRequest),

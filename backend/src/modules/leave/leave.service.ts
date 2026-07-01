@@ -481,7 +481,7 @@ export class LeaveService {
   ) {
     const req = await this.prisma.leaveRequest.findUnique({
       where: { id: requestId },
-      include: { category: true },
+      include: { category: true, personnel: true },
     });
     if (!req) throw new NotFoundException('Talep bulunamadı');
     if (req.status !== LeaveStatus.CANCEL_REQUESTED) {
@@ -518,6 +518,32 @@ export class LeaveService {
       throw new BadRequestException(
         'İzin onay beklerken başlamış; artık iptal edilemez',
       );
+    }
+
+    // Genel kural: yönetici onayladıktan sonra son adım İK'dır. Onaylayan
+    // zaten İK değilse ve başka bir aktif İK varsa, iptal talebi ona devredilir.
+    const approverPersonnel = await this.prisma.personnel.findUnique({
+      where: { id: approverPersonnelId },
+      select: { user: { select: { role: true } } },
+    });
+    if (approverPersonnel?.user.role !== Role.HR) {
+      const hrId = await this.finalHrApprover(req.personnelId);
+      if (hrId && hrId !== approverPersonnelId) {
+        const updated = await this.prisma.leaveRequest.update({
+          where: { id: requestId },
+          data: { cancelApproverId: hrId, cancelRequestedAt: new Date() },
+        });
+        await this.notifications.create({
+          recipientId: hrId,
+          senderId: approverPersonnelId,
+          type: NotificationType.LEAVE_CANCEL_PENDING,
+          title: 'İzin iptal talebi onayınızı bekliyor',
+          body: `${req.personnel.firstName} ${req.personnel.lastName} onaylı izninin iptalini talep etti (yönetici onayladı, son onay sizde).`,
+          refType: 'LeaveRequest',
+          refId: requestId,
+        });
+        return updated;
+      }
     }
 
     const affectsBalance = req.category

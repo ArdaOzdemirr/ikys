@@ -183,11 +183,12 @@ class ApprovalService {
     return (res.data as List).map((e) => PendingApproval.fromJson(e)).toList();
   }
 
-  static Future<void> decideCancellation(String id, bool approved, {String? rejectionReason}) async {
-    await ApiClient.instance.dio.patch('/leave/requests/$id/cancellation-decision', data: {
+  static Future<String?> decideCancellation(String id, bool approved, {String? rejectionReason}) async {
+    final res = await ApiClient.instance.dio.patch('/leave/requests/$id/cancellation-decision', data: {
       'approved': approved,
       if (rejectionReason != null && rejectionReason.isNotEmpty) 'rejectionReason': rejectionReason,
     });
+    return res.data['message'] as String?;
   }
 }
 

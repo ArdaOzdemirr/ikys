@@ -511,7 +511,7 @@ export class LeaveService {
         refType: 'LeaveRequest',
         refId: requestId,
       });
-      return updated;
+      return { ...updated, message: 'İptal talebi reddedildi, izin geçerliliğini koruyor.' };
     }
 
     if (req.startDate <= new Date()) {
@@ -542,7 +542,10 @@ export class LeaveService {
           refType: 'LeaveRequest',
           refId: requestId,
         });
-        return updated;
+        return {
+          ...updated,
+          message: 'Onayınız kaydedildi; son onay için İK\'ya iletildi.',
+        };
       }
     }
 
@@ -590,7 +593,7 @@ export class LeaveService {
         tx,
       );
 
-      return updated;
+      return { ...updated, message: 'İzin iptal edildi.' };
     });
   }
 

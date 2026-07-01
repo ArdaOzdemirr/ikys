@@ -42,8 +42,8 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
 
   Future<void> _approveCancellation(PendingApproval a) async {
     try {
-      await ApprovalService.decideCancellation(a.id, true);
-      _snack('İptal talebi onaylandı');
+      final message = await ApprovalService.decideCancellation(a.id, true);
+      _snack(message ?? 'İptal talebi onaylandı');
       await _load();
     } catch (e) {
       _snack(ApiClient.errorMessage(e, 'İşlem başarısız'));
@@ -76,8 +76,8 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     );
     if (reason == null) return;
     try {
-      await ApprovalService.decideCancellation(a.id, false, rejectionReason: reason);
-      _snack('İptal talebi reddedildi; izin geçerliliğini koruyor');
+      final message = await ApprovalService.decideCancellation(a.id, false, rejectionReason: reason);
+      _snack(message ?? 'İptal talebi reddedildi; izin geçerliliğini koruyor');
       await _load();
     } catch (e) {
       _snack(ApiClient.errorMessage(e, 'İşlem başarısız'));

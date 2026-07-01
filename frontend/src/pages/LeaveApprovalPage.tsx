@@ -46,8 +46,8 @@ export default function LeaveApprovalPage() {
   const decideCancellation = useMutation({
     mutationFn: ({ id, approved, rejectionReason }: any) =>
       api.patch(`/leave/requests/${id}/cancellation-decision`, { approved, rejectionReason }),
-    onSuccess: () => {
-      toast.success('İşlem tamamlandı');
+    onSuccess: (res: any) => {
+      toast.success(res?.message || 'İşlem tamamlandı');
       qc.invalidateQueries({ queryKey: ['leave-pending-cancellations'] });
       qc.invalidateQueries({ queryKey: ['notif-unread'] });
       setCancelRejectId(null);

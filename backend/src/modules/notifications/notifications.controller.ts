@@ -14,6 +14,8 @@ import { NotificationsService } from './notifications.service';
 import { SendMessageDto, ReplyMessageDto, BroadcastDto, DeviceTokenDto } from './notifications.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../config/prisma.service';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 
 @ApiTags('notifications')
 @ApiBearerAuth()
@@ -77,6 +79,7 @@ export class NotificationsController {
   }
 
   @Post('broadcast')
+  @Roles(Role.HR, Role.ADMIN, Role.ACCOUNTING)
   @ApiOperation({ summary: 'Tüm personele toplu duyuru gönderir (bildirim + e-posta + push)' })
   async broadcast(
     @CurrentUser('userId') userId: string,

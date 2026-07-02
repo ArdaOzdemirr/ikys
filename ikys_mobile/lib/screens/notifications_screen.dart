@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/models.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_client.dart';
 import '../services/services.dart';
 
@@ -378,6 +380,9 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
             .toList();
     final canSend = _title.text.trim().isNotEmpty &&
         (_broadcast || widget.replyToNotificationId != null || _selected.isNotEmpty);
+    final canBroadcast = context
+        .watch<AuthProvider>()
+        .hasRole(['HR', 'ADMIN', 'ACCOUNTING']);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mesaj Gönder')),
@@ -386,6 +391,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (canBroadcast)
                 Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(

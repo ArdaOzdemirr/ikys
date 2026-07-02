@@ -6,6 +6,7 @@ import {
   Bell, CheckCheck, Send, Inbox, CalendarCheck, CalendarX, Clock,
   MessageSquare, Trash2, Reply,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NotificationItem {
   id: string;
@@ -217,6 +218,8 @@ function InboxList({
 
 function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => void }) {
   const qc = useQueryClient();
+  const { hasRole } = useAuth();
+  const canBroadcast = hasRole('HR', 'ADMIN', 'ACCOUNTING');
   const [broadcast, setBroadcast] = useState(false);
   const [search, setSearch] = useState('');
   const [priority, setPriority] = useState<'NORMAL' | 'IMPORTANT' | 'URGENT'>('NORMAL');
@@ -281,16 +284,18 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        İstediğiniz herhangi bir çalışana mesaj gönderebilirsiniz; tek tek seçebilir
-        veya toplu duyuru olarak tüm personele gönderebilirsiniz.
+        İstediğiniz herhangi bir çalışana mesaj gönderebilirsiniz; tek tek seçebilirsiniz
+        {canBroadcast && ' veya toplu duyuru olarak tüm personele gönderebilirsiniz'}.
       </p>
 
       <div className="card space-y-4">
+        {canBroadcast && (
         <label className="flex items-center gap-2 text-sm bg-brand-50 text-brand-800 rounded-lg px-3 py-2">
           <input type="checkbox" className="accent-brand-600" checked={broadcast}
             onChange={(e) => setBroadcast(e.target.checked)} />
           Herkese gönder (toplu duyuru)
         </label>
+        )}
 
         {replyTo && !broadcast && (
           <div className="flex items-center gap-2 text-sm bg-brand-50 text-brand-700 rounded-lg px-3 py-2">

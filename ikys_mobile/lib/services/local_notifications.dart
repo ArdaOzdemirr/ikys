@@ -42,6 +42,7 @@ class LocalNotifications {
     description: 'Genel bildirimler',
     importance: Importance.defaultImportance,
     playSound: true,
+    enableVibration: true,
   );
 
   static Future<void> init() async {
@@ -105,7 +106,7 @@ class LocalNotifications {
       icon: '@mipmap/ic_launcher',
       sound: urgent ? const RawResourceAndroidNotificationSound('urgent') : null,
       playSound: true,
-      enableVibration: urgent || important,
+      enableVibration: true,
       ticker: urgent ? 'Çok önemli bildirim' : 'Bildirim',
       styleInformation:
           body != null ? BigTextStyleInformation(body) : null,

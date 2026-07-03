@@ -172,6 +172,52 @@ export class AttendanceService {
   }
 
   /**
+   * İK/Admin için: bir günde tüm aktif personelin giriş/çıkış durumu
+   * (kaydı olmayanlar "henüz giriş yapmadı" olarak döner).
+   */
+  async allForDate(dateStr?: string) {
+    let normalized: Date;
+    if (dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      normalized = new Date(Date.UTC(y, m - 1, d));
+    } else {
+      normalized = this.todayInTurkey();
+    }
+
+    const [personnel, records] = await Promise.all([
+      this.prisma.personnel.findMany({
+        where: { status: 'ACTIVE' },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          employeeNo: true,
+          department: { select: { name: true } },
+        },
+        orderBy: [{ firstName: 'asc' }],
+      }),
+      this.prisma.attendance.findMany({ where: { date: normalized } }),
+    ]);
+
+    const byPersonnel = new Map(records.map((r) => [r.personnelId, r]));
+
+    return personnel.map((p) => {
+      const r = byPersonnel.get(p.id);
+      return {
+        personnelId: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        employeeNo: p.employeeNo,
+        department: p.department?.name ?? null,
+        checkIn: r?.checkIn ?? null,
+        checkOut: r?.checkOut ?? null,
+        isLate: r?.isLate ?? false,
+        workedMinutes: r?.workedMinutes ?? null,
+      };
+    });
+  }
+
+  /**
    * Belge: "Günlük/aylık çalışma saatleri"
    */
   async monthlyReport(personnelId: string, year: number, month: number) {

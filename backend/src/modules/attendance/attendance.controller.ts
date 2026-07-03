@@ -50,6 +50,13 @@ export class AttendanceController {
     return this.service.myAttendance(personnel.id, startDate, endDate);
   }
 
+  @Get('all')
+  @Roles(Role.ADMIN, Role.HR)
+  @ApiOperation({ summary: 'Tüm personelin bir günkü giriş/çıkış durumu (varsayılan: bugün)' })
+  allForDate(@Query('date') date?: string) {
+    return this.service.allForDate(date);
+  }
+
   @Get(':personnelId/monthly')
   @Roles(Role.ADMIN, Role.HR, Role.MANAGER)
   monthly(

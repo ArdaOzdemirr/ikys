@@ -9,6 +9,7 @@ import PersonnelDetailPage from './pages/PersonnelDetailPage';
 import OrgChartPage from './pages/OrgChartPage';
 import CompanyStructurePage from './pages/CompanyStructurePage';
 import AttendancePage from './pages/AttendancePage';
+import AttendanceOverviewPage from './pages/AttendanceOverviewPage';
 import QrAttendancePage from './pages/QrAttendancePage';
 import LeavePage from './pages/LeavePage';
 import LeaveApprovalPage from './pages/LeaveApprovalPage';
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/company-structure" element={<CompanyStructurePage />} />
         <Route path="/org-chart" element={<OrgChartPage />} />
         <Route path="/attendance" element={<AttendancePage />} />
+        <Route path="/attendance/overview" element={<AttendanceOverviewPage />} />
         <Route path="/attendance/qr" element={<QrAttendancePage />} />
         <Route path="/leave" element={<LeavePage />} />
         <Route path="/leave/approvals" element={<LeaveApprovalPage />} />

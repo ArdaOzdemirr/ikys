@@ -18,4 +18,4 @@ workflows:
           cp -r build/ios/iphoneos/Runner.app Payload/
           zip -r ikys-unsigned.ipa Payload
     artifacts:
-      - ikys_mobile/ikys-unsigned.ipa
+      - "**/*.ipa"

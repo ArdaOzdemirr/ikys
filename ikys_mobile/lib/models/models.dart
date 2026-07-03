@@ -193,6 +193,44 @@ class NotificationItem {
   }
 }
 
+class AttendanceOverviewRow {
+  final String personnelId;
+  final String firstName;
+  final String lastName;
+  final String employeeNo;
+  final String? department;
+  final DateTime? checkIn;
+  final DateTime? checkOut;
+  final bool isLate;
+  final int? workedMinutes;
+
+  AttendanceOverviewRow({
+    required this.personnelId,
+    required this.firstName,
+    required this.lastName,
+    required this.employeeNo,
+    this.department,
+    this.checkIn,
+    this.checkOut,
+    this.isLate = false,
+    this.workedMinutes,
+  });
+
+  String get fullName => '$firstName $lastName';
+
+  factory AttendanceOverviewRow.fromJson(Map<String, dynamic> j) => AttendanceOverviewRow(
+        personnelId: j['personnelId'],
+        firstName: j['firstName'],
+        lastName: j['lastName'],
+        employeeNo: j['employeeNo'],
+        department: j['department'],
+        checkIn: j['checkIn'] != null ? DateTime.parse(j['checkIn']) : null,
+        checkOut: j['checkOut'] != null ? DateTime.parse(j['checkOut']) : null,
+        isLate: j['isLate'] ?? false,
+        workedMinutes: j['workedMinutes'],
+      );
+}
+
 class MessageRecipient {
   final String id;
   final String firstName;

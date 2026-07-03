@@ -41,6 +41,13 @@ class AttendanceService {
       if (longitude != null) 'longitude': longitude,
     });
   }
+
+  /// İK/Admin: bir günde tüm aktif personelin giriş/çıkış durumu.
+  static Future<List<AttendanceOverviewRow>> allForDate(String date) async {
+    final res = await ApiClient.instance.dio
+        .get('/attendance/all', queryParameters: {'date': date});
+    return (res.data as List).map((e) => AttendanceOverviewRow.fromJson(e)).toList();
+  }
 }
 
 class LeaveService {

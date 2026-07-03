@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'leave_list_screen.dart';
 import 'categories_admin_screen.dart';
+import 'attendance_overview_screen.dart';
 
 /// Yönetim merkezi: role göre İzin Listesi ve İzin Kategorileri'ne erişim.
 class ManagementScreen extends StatelessWidget {
@@ -12,6 +13,7 @@ class ManagementScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final canCategories = auth.hasRole(['HR', 'ADMIN']);
+    final canAttendanceOverview = auth.hasRole(['HR', 'ADMIN']);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -30,6 +32,14 @@ class ManagementScreen extends StatelessWidget {
             title: 'İzin Kategorileri',
             subtitle: 'Kategori aç/düzenle, kişiye özel gizle',
             screen: const CategoriesAdminScreen(),
+          ),
+        if (canAttendanceOverview)
+          _tile(
+            context,
+            icon: Icons.groups_outlined,
+            title: 'Personel Mesai Durumu',
+            subtitle: 'Herkesin giriş/çıkış saatini ve geç kalma durumunu gör',
+            screen: const AttendanceOverviewScreen(),
           ),
       ],
     );

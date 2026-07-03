@@ -1,0 +1,21 @@
+workflows:
+  ios-unsigned:
+    name: iOS Unsigned Build (AltStore ile kurulum için)
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    working_directory: ikys_mobile
+    environment:
+      flutter: stable
+    scripts:
+      - name: Bağımlılıkları al
+        script: flutter pub get
+      - name: İmzasız iOS build al
+        script: |
+          flutter build ios --release --no-codesign
+      - name: İmzasız IPA paketle
+        script: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r ikys-unsigned.ipa Payload
+    artifacts:
+      - ikys_mobile/ikys-unsigned.ipa

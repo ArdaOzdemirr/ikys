@@ -36,9 +36,8 @@ class _ExpensesScreenState extends State<ExpensesScreen>
   @override
   void initState() {
     super.initState();
-    _isApprover = context.read<AuthProvider>()
-        .hasRole(['MANAGER', 'HR', 'ACCOUNTING', 'ADMIN']);
-    _isAccounting = context.read<AuthProvider>().hasRole(['ACCOUNTING', 'ADMIN']);
+    _isApprover = context.read<AuthProvider>().hasRole(['HR', 'ACCOUNTING']);
+    _isAccounting = context.read<AuthProvider>().hasRole(['HR', 'ACCOUNTING']);
     _tab = TabController(length: _tabCount, vsync: this);
     _load();
   }

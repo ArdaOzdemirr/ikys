@@ -3,9 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { Calendar, Plus, Repeat, Trash2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function HolidaysPage() {
   const qc = useQueryClient();
+  const { hasRole } = useAuth();
+  const canManage = hasRole('HR', 'ADMIN');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -52,15 +55,17 @@ export default function HolidaysPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Calendar className="text-brand-600" />
-            Resmi Tatil Yönetimi
+            {canManage ? 'Resmi Tatil Yönetimi' : 'Resmi Tatiller'}
           </h1>
           <p className="text-gray-600 text-sm">
             İzin hesaplamasında kullanılacak tatil günleri (Belge: Dinamik Takvim)
           </p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> Yeni Tatil
-        </button>
+        {canManage && (
+          <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
+            <Plus size={16} /> Yeni Tatil
+          </button>
+        )}
       </div>
 
       {/* Tatiller sabit/yinelenen tarihler olduğundan yıl filtresi yoktur */}
@@ -72,7 +77,7 @@ export default function HolidaysPage() {
       </div>
 
       {/* Yeni Tatil Formu */}
-      {showForm && (
+      {canManage && showForm && (
         <form
           onSubmit={(e) => { e.preventDefault(); create.mutate(); }}
           className="card space-y-3"
@@ -148,14 +153,14 @@ export default function HolidaysPage() {
               <th className="px-4 py-3">Tatil Adı</th>
               <th className="px-4 py-3">Tip</th>
               <th className="px-4 py-3">Tekrarlama</th>
-              <th className="px-4 py-3 text-right">İşlem</th>
+              {canManage && <th className="px-4 py-3 text-right">İşlem</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {isLoading ? (
-              <tr><td colSpan={5} className="text-center py-8 text-gray-500">Yükleniyor...</td></tr>
+              <tr><td colSpan={canManage ? 5 : 4} className="text-center py-8 text-gray-500">Yükleniyor...</td></tr>
             ) : sorted.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-8 text-gray-500">Tatil yok</td></tr>
+              <tr><td colSpan={canManage ? 5 : 4} className="text-center py-8 text-gray-500">Tatil yok</td></tr>
             ) : sorted.map((h: any) => (
               <tr key={h.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm font-mono">
@@ -180,19 +185,21 @@ export default function HolidaysPage() {
                     <span className="text-gray-500">Tek seferlik</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    onClick={() => {
-                      if (confirm(`"${h.name}" tatilini silmek istediğinize emin misiniz?`)) {
-                        remove.mutate(h.id);
-                      }
-                    }}
-                    className="text-gray-400 hover:text-red-600"
-                    title="Sil"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
+                {canManage && (
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => {
+                        if (confirm(`"${h.name}" tatilini silmek istediğinize emin misiniz?`)) {
+                          remove.mutate(h.id);
+                        }
+                      }}
+                      className="text-gray-400 hover:text-red-600"
+                      title="Sil"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

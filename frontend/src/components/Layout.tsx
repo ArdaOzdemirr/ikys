@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
   { to: '/leave/approvals', label: 'İzin Onayları', icon: CheckSquare, roles: ['MANAGER', 'HR', 'ADMIN'] },
   { to: '/leave/list', label: 'İzin Listesi', icon: ListChecks, roles: ['MANAGER', 'HR', 'ACCOUNTING', 'ADMIN'] },
   { to: '/leave/categories', label: 'İzin Kategorileri', icon: Tags, roles: ['HR', 'ADMIN'] },
-  { to: '/leave/holidays', label: 'Resmi Tatiller', icon: CalendarDays, roles: ['ADMIN', 'HR'] },
+  { to: '/leave/holidays', label: 'Resmi Tatiller', icon: CalendarDays },
   { to: '/payroll', label: 'Bordrolarım', icon: Wallet },
   { to: '/payroll/management', label: 'Bordro Yönetimi', icon: FileSpreadsheet, roles: ['HR', 'ACCOUNTING'] },
   { to: '/expenses', label: 'Masraflarım', icon: Receipt },

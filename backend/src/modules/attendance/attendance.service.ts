@@ -3,11 +3,25 @@ import { PrismaService } from '../../config/prisma.service';
 import { AttendanceMethod } from '@prisma/client';
 import { v4 as uuid } from 'uuid';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import { CheckInDto, CheckOutDto } from './attendance.dto';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// Sunucu (Railway) UTC'de çalışıyor; mesai saatleri ve "bugün" her zaman
+// Türkiye saatine göre hesaplanmalı, yoksa geç kalma/gün sınırı yanlış çıkar.
+const TZ = 'Europe/Istanbul';
 
 @Injectable()
 export class AttendanceService {
   constructor(private prisma: PrismaService) {}
+
+  private todayInTurkey(): Date {
+    const d = dayjs().tz(TZ);
+    return new Date(Date.UTC(d.year(), d.month(), d.date()));
+  }
 
   async generateQrCode(branchId?: string) {
     // Sabit QR: süresi yok denecek kadar uzak bir tarih (rotasyon yok)
@@ -42,10 +56,7 @@ export class AttendanceService {
       }
     }
 
-    const today = (() => {
-      const now = new Date();
-      return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-})();
+    const today = this.todayInTurkey();
 
     const existing = await this.prisma.attendance.findUnique({
       where: { personnelId_date: { personnelId, date: today } },
@@ -54,7 +65,6 @@ export class AttendanceService {
       throw new BadRequestException('Bugün zaten giriş yapmışsınız');
     }
 
-    
     const shift = await this.prisma.shiftAssignment.findFirst({
       where: {
         personnelId,
@@ -67,8 +77,9 @@ export class AttendanceService {
     let isLate = false;
     if (shift) {
       const [hh, mm] = shift.shift.startTime.split(':').map(Number);
-      const expectedStart = dayjs().hour(hh).minute(mm).second(0);
-      isLate = dayjs().isAfter(expectedStart.add(15, 'minute')); // 15dk tolerans
+      const nowTr = dayjs().tz(TZ);
+      const expectedStart = nowTr.hour(hh).minute(mm).second(0).millisecond(0);
+      isLate = nowTr.isAfter(expectedStart.add(15, 'minute')); // 15dk tolerans
     }
 
     return this.prisma.attendance.upsert({
@@ -101,10 +112,7 @@ export class AttendanceService {
       }
     }
 
-    const today = (() => {
-      const now = new Date();
-      return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-})();
+    const today = this.todayInTurkey();
 
     const att = await this.prisma.attendance.findUnique({
       where: { personnelId_date: { personnelId, date: today } },

@@ -29,6 +29,30 @@ class AuthResult {
       );
 }
 
+class Holiday {
+  final String id;
+  final String name;
+  final DateTime date;
+  final bool recurring;
+  final bool isOfficial;
+
+  Holiday({
+    required this.id,
+    required this.name,
+    required this.date,
+    this.recurring = false,
+    this.isOfficial = true,
+  });
+
+  factory Holiday.fromJson(Map<String, dynamic> j) => Holiday(
+        id: j['id'],
+        name: j['name'],
+        date: DateTime.parse(j['date']),
+        recurring: j['recurring'] ?? false,
+        isOfficial: j['isOfficial'] ?? true,
+      );
+}
+
 class Attendance {
   final String id;
   final DateTime date;

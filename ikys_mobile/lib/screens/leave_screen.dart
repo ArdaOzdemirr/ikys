@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../services/services.dart';
+import 'holidays_screen.dart';
 
 const _typeLabels = {
   'ANNUAL': 'Yıllık İzin',
@@ -150,6 +151,17 @@ class _LeaveScreenState extends State<LeaveScreen> {
               onPressed: _openNew,
               style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
               child: const Text('+ Yeni İzin Talebi'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const HolidaysScreen()),
+              ),
+              icon: const Icon(Icons.calendar_month_outlined),
+              label: const Text('Resmi Tatiller'),
             ),
           ),
           const SizedBox(height: 20),

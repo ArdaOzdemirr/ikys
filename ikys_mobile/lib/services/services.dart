@@ -50,6 +50,31 @@ class AttendanceService {
   }
 }
 
+class HolidayService {
+  static Future<List<Holiday>> list() async {
+    final res = await ApiClient.instance.dio.get('/leave/holidays');
+    return (res.data as List).map((e) => Holiday.fromJson(e)).toList();
+  }
+
+  static Future<void> create({
+    required String name,
+    required String date,
+    bool recurring = false,
+    bool isOfficial = true,
+  }) async {
+    await ApiClient.instance.dio.post('/leave/holidays', data: {
+      'name': name,
+      'date': date,
+      'recurring': recurring,
+      'isOfficial': isOfficial,
+    });
+  }
+
+  static Future<void> remove(String id) async {
+    await ApiClient.instance.dio.delete('/leave/holidays/$id');
+  }
+}
+
 class LeaveService {
   static Future<List<LeaveRequest>> myRequests() async {
     final res = await ApiClient.instance.dio.get('/leave/requests/me');

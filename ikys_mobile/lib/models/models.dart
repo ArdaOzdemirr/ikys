@@ -224,8 +224,8 @@ class AttendanceOverviewRow {
         lastName: j['lastName'],
         employeeNo: j['employeeNo'],
         department: j['department'],
-        checkIn: j['checkIn'] != null ? DateTime.parse(j['checkIn']) : null,
-        checkOut: j['checkOut'] != null ? DateTime.parse(j['checkOut']) : null,
+        checkIn: j['checkIn'] != null ? DateTime.parse(j['checkIn']).toLocal() : null,
+        checkOut: j['checkOut'] != null ? DateTime.parse(j['checkOut']).toLocal() : null,
         isLate: j['isLate'] ?? false,
         workedMinutes: j['workedMinutes'],
       );

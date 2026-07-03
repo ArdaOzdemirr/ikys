@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
   { to: '/leave/categories', label: 'İzin Kategorileri', icon: Tags, roles: ['HR', 'ADMIN'] },
   { to: '/leave/holidays', label: 'Resmi Tatiller', icon: CalendarDays, roles: ['ADMIN', 'HR'] },
   { to: '/payroll', label: 'Bordrolarım', icon: Wallet },
-  { to: '/payroll/management', label: 'Bordro Yönetimi', icon: FileSpreadsheet, roles: ['HR', 'ADMIN', 'ACCOUNTING'] },
+  { to: '/payroll/management', label: 'Bordro Yönetimi', icon: FileSpreadsheet, roles: ['HR', 'ACCOUNTING'] },
   { to: '/expenses', label: 'Masraflarım', icon: Receipt },
   { to: '/expenses/approvals', label: 'Masraf Onayları', icon: CheckSquare, roles: ['HR', 'ACCOUNTING'] },
   { to: '/recruitment', label: 'İşe Alım', icon: Briefcase, roles: ['HR', 'ADMIN', 'MANAGER'] },

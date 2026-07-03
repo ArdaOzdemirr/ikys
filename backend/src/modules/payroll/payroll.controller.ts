@@ -47,14 +47,14 @@ export class PayrollController {
 
   // === Maaş Konfigürasyonu ===
   @Post('salary/:personnelId')
-  @Roles(Role.HR, Role.ADMIN, Role.ACCOUNTING)
+  @Roles(Role.HR, Role.ACCOUNTING)
   setSalary(@Param('personnelId') personnelId: string, @Body() dto: SetSalaryDto) {
     return this.service.setSalary(personnelId, dto);
   }
 
   // === Bordro ===
   @Get('personnel')
-  @Roles(Role.HR, Role.ADMIN, Role.ACCOUNTING)
+  @Roles(Role.HR, Role.ACCOUNTING)
   @ApiOperation({ summary: 'Aktif personel + maaş bilgisi (bordro ekranı için)' })
   payrollPersonnel() {
     return this.prisma.personnel.findMany({
@@ -72,7 +72,7 @@ export class PayrollController {
   }
 
   @Post('generate')
-  @Roles(Role.HR, Role.ADMIN, Role.ACCOUNTING)
+  @Roles(Role.HR, Role.ACCOUNTING)
   @ApiOperation({ summary: 'Aylık bordro oluştur (Belge: FR-05)' })
   generate(@Body() dto: GeneratePayrollDto) {
     return this.service.generatePayroll(dto);

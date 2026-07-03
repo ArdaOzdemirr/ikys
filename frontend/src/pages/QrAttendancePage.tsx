@@ -20,7 +20,7 @@ export default function QrAttendancePage() {
   const { data: qrData, refetch } = useQuery({
     queryKey: ['qr-code'],
     queryFn: () => api.get('/attendance/qr-code'),
-    enabled: hasRole('ADMIN'),
+    enabled: hasRole('HR'),
   });
 
   useEffect(() => {
@@ -40,10 +40,10 @@ export default function QrAttendancePage() {
     }
   }, [qrData]);
 
-  if (!hasRole('ADMIN')) {
+  if (!hasRole('HR')) {
     return (
       <div className="p-8 text-center">
-        <p className="text-gray-600">Bu sayfa sadece Admin için.</p>
+        <p className="text-gray-600">Bu sayfa sadece İK için.</p>
       </div>
     );
   }

@@ -21,7 +21,7 @@ const navItems: NavItem[] = [
   { to: '/company-structure', label: 'Şirket Yapısı', icon: Network, roles: ['ADMIN', 'HR'] },
   { to: '/org-chart', label: 'Organizasyon', icon: GitBranch },
   { to: '/attendance', label: 'Mesai', icon: Clock },
-  { to: '/attendance/qr', label: 'QR Mesai Ekranı', icon: QrCode, roles: ['ADMIN'] },
+  { to: '/attendance/qr', label: 'QR Mesai Ekranı', icon: QrCode, roles: ['HR'] },
   { to: '/leave', label: 'İzinlerim', icon: Calendar },
   { to: '/leave/approvals', label: 'İzin Onayları', icon: CheckSquare, roles: ['MANAGER', 'HR', 'ADMIN'] },
   { to: '/leave/list', label: 'İzin Listesi', icon: ListChecks, roles: ['MANAGER', 'HR', 'ACCOUNTING', 'ADMIN'] },

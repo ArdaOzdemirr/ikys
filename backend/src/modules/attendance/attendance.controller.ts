@@ -16,10 +16,10 @@ export class AttendanceController {
     private readonly prisma: PrismaService,
   ) {}
 
-  // Dinamik QR kod oluşturuyor
+  // Sabit QR kodu döner (şube başına tek kod)
   @Get('qr-code')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Dinamik QR kod oluştur (30 sn geçerli)' })
+  @Roles(Role.HR)
+  @ApiOperation({ summary: 'Sabit QR kodu getir' })
   qr(@Query('branchId') branchId?: string) {
     return this.service.generateQrCode(branchId);
   }

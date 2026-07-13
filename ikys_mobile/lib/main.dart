@@ -28,8 +28,13 @@ Future<void> main() async {
     // Firebase yapılandırması yoksa uygulama yine de açılsın
   }
   await ApiClient.instance.init();
-  await LocalNotifications.init();
-  await PushService.init();
+  try {
+    await LocalNotifications.init();
+    await PushService.init();
+  } catch (_) {
+    // Firebase yapılandırması yoksa (ör. iOS'ta GoogleService-Info.plist
+    // eksikse) push devre dışı kalsın, uygulama yine de açılsın
+  }
   runApp(const IkysApp());
 }
 

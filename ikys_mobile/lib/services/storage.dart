@@ -14,6 +14,8 @@ class TokenStorage {
   static const _kRefresh = 'refreshToken';
   static const _kUser = 'user';
   static const _kApiBaseUrl = 'apiBaseUrlOverride';
+  static const _kRememberedEmail = 'rememberedEmail';
+  static const _kRememberedPassword = 'rememberedPassword';
 
   Future<String?> getAccess() => _s.read(key: _kAccess);
   Future<String?> getRefresh() => _s.read(key: _kRefresh);
@@ -50,4 +52,24 @@ class TokenStorage {
       _s.write(key: _kApiBaseUrl, value: url);
 
   Future<void> clearApiBaseUrlOverride() => _s.delete(key: _kApiBaseUrl);
+
+  /// "Beni Hatırla" işaretliyse giriş bilgilerini saklar; giriş ekranı ile
+  /// sınırlıdır, clear() (çıkış) sırasında silinmez ki bir dahaki girişte
+  /// tekrar sorulmasın.
+  Future<void> setRememberedCredentials(String email, String password) async {
+    await _s.write(key: _kRememberedEmail, value: email);
+    await _s.write(key: _kRememberedPassword, value: password);
+  }
+
+  Future<({String email, String password})?> getRememberedCredentials() async {
+    final email = await _s.read(key: _kRememberedEmail);
+    final password = await _s.read(key: _kRememberedPassword);
+    if (email == null || password == null) return null;
+    return (email: email, password: password);
+  }
+
+  Future<void> clearRememberedCredentials() async {
+    await _s.delete(key: _kRememberedEmail);
+    await _s.delete(key: _kRememberedPassword);
+  }
 }

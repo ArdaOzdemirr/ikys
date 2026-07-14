@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_client.dart';
+import '../services/storage.dart';
 import 'server_settings_sheet.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,7 +18,24 @@ class _LoginScreenState extends State<LoginScreen> {
   final _token = TextEditingController();
   bool _requires2FA = false;
   bool _loading = false;
+  bool _rememberMe = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRemembered();
+  }
+
+  Future<void> _loadRemembered() async {
+    final saved = await TokenStorage.instance.getRememberedCredentials();
+    if (saved != null && mounted) {
+      setState(() {
+        _email.text = saved.email;
+        _password.text = saved.password;
+      });
+    }
+  }
 
   Future<void> _submit() async {
     setState(() {
@@ -33,6 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (res.requires2FA) {
         setState(() => _requires2FA = true);
+      } else if (_rememberMe) {
+        await TokenStorage.instance
+            .setRememberedCredentials(_email.text.trim(), _password.text);
+      } else {
+        await TokenStorage.instance.clearRememberedCredentials();
       }
       // Başarılı girişte router otomatik /home'a yönlendirir.
     } catch (e) {
@@ -103,6 +126,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: 'Şifre',
                         border: OutlineInputBorder(),
                       ),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: _rememberMe,
+                      onChanged: (v) => setState(() => _rememberMe = v ?? true),
+                      title: const Text('Beni Hatırla', style: TextStyle(fontSize: 14)),
                     ),
                   ] else ...[
                     TextField(

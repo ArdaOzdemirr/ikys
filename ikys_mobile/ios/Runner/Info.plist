@@ -30,6 +30,8 @@
 	<string>Mesai QR kodunu okutabilmek için kameraya erişim gereklidir.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Mesai giriş/çıkışında konumunuzu doğrulamak için konum erişimi gereklidir.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Mesai giriş/çıkışında konumunuzu doğrulamak için konum erişimi gereklidir.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Fiş/fatura fotoğrafı yükleyebilmek için galeriye erişim gereklidir.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

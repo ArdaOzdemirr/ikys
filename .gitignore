@@ -12,6 +12,7 @@ build/
 .env.*.local
 backend/firebase-service-account.json
 ikys_mobile/android/app/google-services.json
+ikys_mobile/ios/Runner/GoogleService-Info.plist
 
 # Kullanıcı yüklemeleri (çalışma zamanında oluşur, repoya girmemeli)
 backend/uploads/

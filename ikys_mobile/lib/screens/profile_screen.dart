@@ -62,6 +62,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _testPushToken() async {
+    final result = await PushService.debugRegisterToken();
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Bildirim Token Testi'),
+        content: SingleChildScrollView(child: Text(result)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Kapat')),
+        ],
+      ),
+    );
+  }
+
   Future<void> _changePassword() async {
     final ok = await showModalBottomSheet<bool>(
       context: context,
@@ -164,6 +179,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
 
           const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: _testPushToken,
+            icon: const Icon(Icons.notifications_active_outlined),
+            label: const Text('Bildirim Token Testi'),
+            style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14)),
+          ),
+          const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: _changePassword,
             icon: const Icon(Icons.lock_outline),

@@ -52,6 +52,49 @@ class PushService {
     }
   }
 
+  /// Ekranda göstermek üzere, her adımı ayrıntılı raporlayan test fonksiyonu.
+  static Future<String> debugRegisterToken() async {
+    final log = StringBuffer();
+    log.writeln('Platform: ${Platform.isIOS ? 'iOS' : 'Android'}');
+    try {
+      final settings = await _fm.getNotificationSettings();
+      log.writeln('Bildirim izni: ${settings.authorizationStatus}');
+
+      if (Platform.isIOS) {
+        String? apnsToken = await _fm.getAPNSToken();
+        log.writeln('İlk APNs token: ${apnsToken ?? "null"}');
+        var retries = 0;
+        while (apnsToken == null && retries < 6) {
+          await Future.delayed(const Duration(seconds: 1));
+          apnsToken = await _fm.getAPNSToken();
+          retries++;
+          log.writeln('Deneme $retries: ${apnsToken ?? "null"}');
+        }
+        if (apnsToken == null) {
+          log.writeln('SONUÇ: APNs token hiç alınamadı.');
+          return log.toString();
+        }
+      }
+
+      final token = await _fm.getToken();
+      if (token == null) {
+        log.writeln('SONUÇ: FCM token null döndü.');
+        return log.toString();
+      }
+      log.writeln('FCM token (ilk 25 hane): ${token.substring(0, 25)}...');
+
+      final res = await ApiClient.instance.dio.post('/notifications/device-token', data: {
+        'token': token,
+        'platform': Platform.isIOS ? 'ios' : 'android',
+      });
+      log.writeln('Backend cevabı: ${res.statusCode}');
+      log.writeln('SONUÇ: Başarılı.');
+    } catch (e) {
+      log.writeln('HATA: $e');
+    }
+    return log.toString();
+  }
+
   /// Çıkışta token'ı sunucudan sil (başkasına bildirim gitmesin).
   static Future<void> unregisterToken() async {
     try {

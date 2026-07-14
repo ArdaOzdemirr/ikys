@@ -18,6 +18,7 @@ import {
   ResignDto,
   ListPersonnelDto,
   UpdateMyProfileDto,
+  UpdateEmailDto,
 } from './personnel.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -78,6 +79,13 @@ export class PersonnelController {
   @Roles(Role.ADMIN, Role.HR)
   update(@Param('id') id: string, @Body() dto: UpdatePersonnelDto) {
     return this.service.update(id, dto);
+  }
+
+  @Patch(':id/email')
+  @Roles(Role.HR)
+  @ApiOperation({ summary: 'E-posta güncelle (sadece İK, kendi e-postası dahil)' })
+  updateEmail(@Param('id') id: string, @Body() dto: UpdateEmailDto) {
+    return this.service.updateEmail(id, dto);
   }
 
   @Patch(':id/resign')

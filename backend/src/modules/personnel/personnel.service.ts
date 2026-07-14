@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../config/prisma.service';
 import * as bcrypt from 'bcrypt';
-import { CreatePersonnelDto, UpdatePersonnelDto, ResignDto } from './personnel.dto';
+import { CreatePersonnelDto, UpdatePersonnelDto, ResignDto, UpdateEmailDto } from './personnel.dto';
 import { PersonnelStatus, Role } from '@prisma/client';
 
 @Injectable()
@@ -156,6 +156,20 @@ export class PersonnelService {
 
     // KVKK: TCKN'yi maskele (tam veriye sadece HR/Admin erişir - controller'da rol kontrolü)
     return personnel;
+  }
+
+  /** Sadece İK'nın (kendi e-postası dahil) çağırabileceği, ayrı bir uç nokta. */
+  async updateEmail(id: string, dto: UpdateEmailDto) {
+    const personnel = await this.findOne(id);
+    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (existing && existing.id !== personnel.userId) {
+      throw new ConflictException('Bu e-posta adresi zaten kullanılıyor');
+    }
+    await this.prisma.user.update({
+      where: { id: personnel.userId },
+      data: { email: dto.email },
+    });
+    return this.findOne(id);
   }
 
   async update(id: string, dto: UpdatePersonnelDto) {

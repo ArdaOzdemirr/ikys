@@ -117,6 +117,13 @@ export class ListPersonnelDto {
   @ApiProperty({ required: false }) @IsOptional() limit?: string;
 }
 
+// Sadece İK'nın (kendi e-postası dahil) değiştirebileceği alan
+export class UpdateEmailDto {
+  @ApiProperty()
+  @IsEmail()
+  email!: string;
+}
+
 // Kullanıcının kendi profilinde değiştirebileceği güvenli alanlar
 export class UpdateMyProfileDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() phone?: string;

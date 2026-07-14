@@ -23,6 +23,10 @@ workflows:
       - name: Write GoogleService-Info.plist
         script: |
           echo $GOOGLE_SERVICE_INFO_PLIST_BASE64 | base64 --decode > ios/Runner/GoogleService-Info.plist
+          echo "Dosya boyutu:"
+          ls -la ios/Runner/GoogleService-Info.plist
+          echo "Gecerlilik kontrolu:"
+          plutil -lint ios/Runner/GoogleService-Info.plist
       - name: Get Flutter packages
         script: flutter pub get
       - name: Install CocoaPods dependencies

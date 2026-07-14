@@ -6,12 +6,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { Wallet, Edit, FileText, Upload } from 'lucide-react';
 import SalaryConfigModal from '../components/SalaryConfigModal';
 import DocumentUploadModal from '../components/DocumentUploadModal';
+import PersonnelEditModal from '../components/PersonnelEditModal';
 
 export default function PersonnelDetailPage() {
   const { id } = useParams();
   const { hasRole } = useAuth();
   const [showSalary, setShowSalary] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const { data: p, isLoading } = useQuery({
     queryKey: ['personnel', id],
@@ -27,6 +29,7 @@ export default function PersonnelDetailPage() {
     : `${p.tcKimlikNo?.slice(0, 3)}******${p.tcKimlikNo?.slice(-2)}`;
 
   const canSeeSalary = hasRole('ADMIN', 'HR', 'ACCOUNTING');
+  const canEdit = hasRole('ADMIN', 'HR');
 
   return (
     <div className="p-8 space-y-6">
@@ -44,6 +47,15 @@ export default function PersonnelDetailPage() {
             <p className="text-gray-600">{p.position?.title} · {p.department?.name}</p>
             <p className="text-sm text-gray-500 mt-1">Sicil: {p.employeeNo}</p>
           </div>
+          {canEdit && (
+            <button
+              onClick={() => setShowEdit(true)}
+              className="btn-secondary flex items-center gap-1 text-sm h-fit"
+            >
+              <Edit size={14} />
+              Düzenle
+            </button>
+          )}
         </div>
       </div>
 
@@ -157,6 +169,13 @@ export default function PersonnelDetailPage() {
         onClose={() => setShowDocs(false)}
         personnelId={id!}
         personnelName={`${p.firstName} ${p.lastName}`}
+      />
+
+      <PersonnelEditModal
+        open={showEdit}
+        onClose={() => setShowEdit(false)}
+        personnelId={id!}
+        personnel={p}
       />
     </div>
   );

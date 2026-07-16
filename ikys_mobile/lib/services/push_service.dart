@@ -34,8 +34,8 @@ class PushService {
         // (bilinen bir firebase_messaging zamanlama sorunu) — birkaç kez dene.
         String? apnsToken = await _fm.getAPNSToken();
         var retries = 0;
-        while (apnsToken == null && retries < 6) {
-          await Future.delayed(const Duration(seconds: 1));
+        while (apnsToken == null && retries < 10) {
+          await Future.delayed(const Duration(seconds: 2));
           apnsToken = await _fm.getAPNSToken();
           retries++;
         }
@@ -64,15 +64,14 @@ class PushService {
         String? apnsToken = await _fm.getAPNSToken();
         log.writeln('İlk APNs token: ${apnsToken ?? "null"}');
         var retries = 0;
-        while (apnsToken == null && retries < 6) {
-          await Future.delayed(const Duration(seconds: 1));
+        while (apnsToken == null && retries < 10) {
+          await Future.delayed(const Duration(seconds: 2));
           apnsToken = await _fm.getAPNSToken();
           retries++;
           log.writeln('Deneme $retries: ${apnsToken ?? "null"}');
         }
         if (apnsToken == null) {
-          log.writeln('SONUÇ: APNs token hiç alınamadı.');
-          return log.toString();
+          log.writeln('APNs token hâlâ null, yine de FCM token deneniyor...');
         }
       }
 

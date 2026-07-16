@@ -24,10 +24,11 @@ class PushService {
     // Ön planda gelen mesajı yerel bildirim olarak göster (FCM foreground'da
     // otomatik göstermez). Ona dokununca da doğru ekrana gitsin.
     FirebaseMessaging.onMessage.listen(_onForeground);
-    LocalNotifications.onTap = _routeForType;
+    LocalNotifications.onTap = routeForType;
 
     // Uygulama arka plandayken bildirime dokunup öne getirilince
     FirebaseMessaging.onMessageOpenedApp.listen(_onNotificationTap);
+    debugPrint('[Push] onMessageOpenedApp dinleyicisi kuruldu');
 
     // Uygulama tamamen kapalıyken bildirime dokunup açılınca (cold start).
     // runApp() henüz çağrılmadığı için rootNavigatorKey hazır olana kadar
@@ -44,15 +45,23 @@ class PushService {
   }
 
   static void _onNotificationTap(RemoteMessage message) {
+    debugPrint('[Push] bildirime dokunuldu, data=${message.data}');
     final type = message.data['type'] as String?;
-    if (type != null && type.isNotEmpty) _routeForType(type);
+    if (type != null && type.isNotEmpty) {
+      routeForType(type);
+    } else {
+      debugPrint('[Push] data içinde "type" yok, yönlendirme yapılamıyor');
+    }
   }
 
   /// Bildirim türüne göre doğru ekrana gider: mesajlarda "Bildirimler"
   /// (mesaj) sayfasına, izin onayı bekleyenlerde "Onaylar" sekmesine,
   /// izinle ilgili sonuç bildirimlerinde "İzin" sekmesine, masraf/avans
   /// onayı bekleyenlerde ve sonuçlarında "Masraflar" sayfasına.
-  static void _routeForType(String type) {
+  /// (push_service.dart dışından da çağrılır: bildirim listesindeki bir
+  /// öğeye dokununca aynı yönlendirmeyi tetiklemek için.)
+  static void routeForType(String type) {
+    debugPrint('[Push] routeForType: $type');
     const approvalTypes = {'LEAVE_APPROVAL_PENDING', 'LEAVE_CANCEL_PENDING'};
     const leaveStatusTypes = {
       'LEAVE_APPROVED',
@@ -66,32 +75,32 @@ class PushService {
       'EXPENSE_PAID',
     };
 
+    final nav = rootNavigatorKey.currentState;
+    if (nav == null) {
+      debugPrint('[Push] rootNavigatorKey.currentState null, yönlendirilemedi');
+      return;
+    }
+
     if (type == 'MESSAGE') {
-      rootNavigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-      );
+      nav.push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
       return;
     }
     if (approvalTypes.contains(type)) {
-      rootNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+      nav.popUntil((r) => r.isFirst);
       ShellScreen.requestedTab.value = 'approvals';
       return;
     }
     if (leaveStatusTypes.contains(type)) {
-      rootNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+      nav.popUntil((r) => r.isFirst);
       ShellScreen.requestedTab.value = 'leave';
       return;
     }
     if (type == 'EXPENSE_PENDING') {
-      rootNavigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => const ExpensesScreen(initialTab: 'pending')),
-      );
+      nav.push(MaterialPageRoute(builder: (_) => const ExpensesScreen(initialTab: 'pending')));
       return;
     }
     if (expenseStatusTypes.contains(type)) {
-      rootNavigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => const ExpensesScreen(initialTab: 'mine')),
-      );
+      nav.push(MaterialPageRoute(builder: (_) => const ExpensesScreen(initialTab: 'mine')));
     }
   }
 

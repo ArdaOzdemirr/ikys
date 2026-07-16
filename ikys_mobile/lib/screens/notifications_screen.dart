@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_client.dart';
 import '../services/services.dart';
+import '../services/push_service.dart';
 
 const _typeStyle = {
   'LEAVE_APPROVAL_PENDING': (
@@ -74,6 +75,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       await NotificationService.markRead(n.id);
       await _load();
     } catch (_) {}
+  }
+
+  /// Listedeki bir bildirime dokununca: okundu işaretle, mesaj değilse
+  /// (zaten bu ekrandayız) ilgili sayfaya/sekmeye git.
+  Future<void> _open(NotificationItem n) async {
+    await _markRead(n);
+    if (n.type != 'MESSAGE') {
+      PushService.routeForType(n.type);
+    }
   }
 
   Future<void> _markAll() async {
@@ -182,7 +192,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ? const Color(0xFFFBBF24)
             : (n.isRead ? const Color(0xFFF3F4F6) : const Color(0xFFBFDBFE));
     return InkWell(
-      onTap: () => _markRead(n),
+      onTap: () => _open(n),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),

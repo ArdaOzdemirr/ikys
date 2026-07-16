@@ -12,6 +12,9 @@ class LocalNotifications {
       FlutterLocalNotificationsPlugin();
   static bool _ready = false;
 
+  /// Ön planda gösterilen bildirime dokununca çağrılır (push_service.dart bağlar).
+  static void Function(String payload)? onTap;
+
   static const AndroidNotificationChannel _urgentChannel =
       AndroidNotificationChannel(
     'ikys_urgent',
@@ -56,6 +59,10 @@ class LocalNotifications {
     );
     await _plugin.initialize(
       const InitializationSettings(android: androidInit, iOS: iosInit),
+      onDidReceiveNotificationResponse: (details) {
+        final payload = details.payload;
+        if (payload != null) onTap?.call(payload);
+      },
     );
 
     final android = _plugin.resolvePlatformSpecificImplementation<
@@ -74,6 +81,7 @@ class LocalNotifications {
     required String title,
     String? body,
     required String priority,
+    String? payload,
   }) async {
     final urgent = priority == 'URGENT';
     final important = priority == 'IMPORTANT';
@@ -122,6 +130,7 @@ class LocalNotifications {
       title,
       body,
       NotificationDetails(android: androidDetails, iOS: iosDetails),
+      payload: payload,
     );
   }
 }

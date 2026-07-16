@@ -15,7 +15,10 @@ const _statusLabel = {
 };
 
 class ExpensesScreen extends StatefulWidget {
-  const ExpensesScreen({super.key});
+  /// Bildirimden açılırken hangi sekmenin gösterileceği: 'mine' | 'pending'.
+  final String initialTab;
+
+  const ExpensesScreen({super.key, this.initialTab = 'mine'});
 
   @override
   State<ExpensesScreen> createState() => _ExpensesScreenState();
@@ -38,7 +41,8 @@ class _ExpensesScreenState extends State<ExpensesScreen>
     super.initState();
     _isApprover = context.read<AuthProvider>().hasRole(['HR', 'ACCOUNTING']);
     _isAccounting = context.read<AuthProvider>().hasRole(['HR', 'ACCOUNTING']);
-    _tab = TabController(length: _tabCount, vsync: this);
+    final initialIndex = widget.initialTab == 'pending' && _isApprover ? 1 : 0;
+    _tab = TabController(length: _tabCount, vsync: this, initialIndex: initialIndex);
     _load();
   }
 

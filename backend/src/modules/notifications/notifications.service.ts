@@ -66,6 +66,7 @@ export class NotificationsService {
       title: data.title,
       body: data.body,
       priority: data.priority ?? NotificationPriority.NORMAL,
+      type: data.type,
       refType: data.refType,
       refId: data.refId,
     });
@@ -166,7 +167,12 @@ export class NotificationsService {
     });
 
     void this.emailPersonnel([original.senderId], title, body);
-    void this.push.sendToPersonnel([original.senderId], { title, body, priority });
+    void this.push.sendToPersonnel([original.senderId], {
+      title,
+      body,
+      priority,
+      type: NotificationType.MESSAGE,
+    });
 
     return { sent: 1, from: senderName, notification: created };
   }
@@ -272,7 +278,12 @@ export class NotificationsService {
     });
 
     void this.emailPersonnel(targets, title, body);
-    void this.push.sendToPersonnel(targets, { title, body, priority });
+    void this.push.sendToPersonnel(targets, {
+      title,
+      body,
+      priority,
+      type: NotificationType.MESSAGE,
+    });
 
     return { sent: targets.length, from: senderName };
   }
@@ -306,7 +317,12 @@ export class NotificationsService {
     });
 
     void this.emailPersonnel(ids, title, body);
-    void this.push.sendToPersonnel(ids, { title, body, priority });
+    void this.push.sendToPersonnel(ids, {
+      title,
+      body,
+      priority,
+      type: NotificationType.MESSAGE,
+    });
 
     return { sent: ids.length };
   }

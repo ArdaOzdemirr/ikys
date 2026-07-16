@@ -7,6 +7,7 @@ type PushPayload = {
   title: string;
   body?: string;
   priority?: 'NORMAL' | 'IMPORTANT' | 'URGENT';
+  type?: string;
   refType?: string | null;
   refId?: string | null;
 };
@@ -96,6 +97,7 @@ export class PushService {
         notification: { title: payload.title, body: payload.body || '' },
         data: {
           priority,
+          type: payload.type || '',
           refType: payload.refType || '',
           refId: payload.refId || '',
         },

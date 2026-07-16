@@ -1,7 +1,12 @@
 import 'dart:io' show Platform;
+import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'api_client.dart';
 import 'local_notifications.dart';
+import '../router.dart';
+import '../screens/notifications_screen.dart';
+import '../screens/expenses_screen.dart';
+import '../screens/shell_screen.dart';
 
 /// FCM push: cihaz token'ını backend'e kaydeder, ön planda (foreground) gelen
 /// push'u doğru kanalda (önem seviyesine göre) yerel bildirim olarak gösterir.
@@ -17,13 +22,77 @@ class PushService {
     await _fm.requestPermission(alert: true, badge: true, sound: true);
 
     // Ön planda gelen mesajı yerel bildirim olarak göster (FCM foreground'da
-    // otomatik göstermez).
+    // otomatik göstermez). Ona dokununca da doğru ekrana gitsin.
     FirebaseMessaging.onMessage.listen(_onForeground);
+    LocalNotifications.onTap = _routeForType;
+
+    // Uygulama arka plandayken bildirime dokunup öne getirilince
+    FirebaseMessaging.onMessageOpenedApp.listen(_onNotificationTap);
+
+    // Uygulama tamamen kapalıyken bildirime dokunup açılınca (cold start).
+    // runApp() henüz çağrılmadığı için rootNavigatorKey hazır olana kadar
+    // (ilk frame render olana kadar) bekleyip öyle yönlendiriyoruz.
+    final initial = await _fm.getInitialMessage();
+    if (initial != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onNotificationTap(initial));
+    }
 
     // Token yenilenince tekrar kaydet
     _fm.onTokenRefresh.listen((_) => registerToken());
 
     _ready = true;
+  }
+
+  static void _onNotificationTap(RemoteMessage message) {
+    final type = message.data['type'] as String?;
+    if (type != null && type.isNotEmpty) _routeForType(type);
+  }
+
+  /// Bildirim türüne göre doğru ekrana gider: mesajlarda "Bildirimler"
+  /// (mesaj) sayfasına, izin onayı bekleyenlerde "Onaylar" sekmesine,
+  /// izinle ilgili sonuç bildirimlerinde "İzin" sekmesine, masraf/avans
+  /// onayı bekleyenlerde ve sonuçlarında "Masraflar" sayfasına.
+  static void _routeForType(String type) {
+    const approvalTypes = {'LEAVE_APPROVAL_PENDING', 'LEAVE_CANCEL_PENDING'};
+    const leaveStatusTypes = {
+      'LEAVE_APPROVED',
+      'LEAVE_REJECTED',
+      'LEAVE_CANCEL_APPROVED',
+      'LEAVE_CANCEL_REJECTED',
+    };
+    const expenseStatusTypes = {
+      'EXPENSE_APPROVED',
+      'EXPENSE_REJECTED',
+      'EXPENSE_PAID',
+    };
+
+    if (type == 'MESSAGE') {
+      rootNavigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+      );
+      return;
+    }
+    if (approvalTypes.contains(type)) {
+      rootNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+      ShellScreen.requestedTab.value = 'approvals';
+      return;
+    }
+    if (leaveStatusTypes.contains(type)) {
+      rootNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+      ShellScreen.requestedTab.value = 'leave';
+      return;
+    }
+    if (type == 'EXPENSE_PENDING') {
+      rootNavigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const ExpensesScreen(initialTab: 'pending')),
+      );
+      return;
+    }
+    if (expenseStatusTypes.contains(type)) {
+      rootNavigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const ExpensesScreen(initialTab: 'mine')),
+      );
+    }
   }
 
   /// Giriş yapıldıktan sonra çağrılır (auth gerektirir).
@@ -113,6 +182,7 @@ class PushService {
       title: n.title ?? 'Bildirim',
       body: n.body,
       priority: priority,
+      payload: m.data['type'] as String?,
     );
   }
 }

@@ -117,6 +117,25 @@ export class LeaveController {
     return this.service.myBalance(personnel.id, year ? +year : undefined);
   }
 
+  @Get('balance/all')
+  @Roles(Role.HR, Role.ADMIN)
+  @ApiOperation({ summary: 'Tüm personelin yıllık izin hakedişi/kullanımı (sadece İK/Admin)' })
+  allBalances() {
+    return this.service.allAnnualBalances();
+  }
+
+  @Get('list/personnel')
+  @Roles(Role.MANAGER, Role.HR, Role.ACCOUNTING, Role.ADMIN)
+  @ApiOperation({ summary: 'İzin Listesi\'nde seçilebilecek personel (role/hiyerarşiye göre)' })
+  async leaveListPersonnel(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+    return this.service.leaveListPersonnel(personnel.id, role);
+  }
+
   @Get('list')
   @Roles(Role.MANAGER, Role.HR, Role.ACCOUNTING, Role.ADMIN)
   @ApiOperation({ summary: 'İzin listesi (role ve hiyerarşiye göre filtrelenir)' })

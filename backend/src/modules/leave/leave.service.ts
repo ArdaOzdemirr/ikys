@@ -15,6 +15,7 @@ import {
 import dayjs from 'dayjs';
 import { CreateLeaveRequestDto, ApproveLeaveDto } from './leave.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { cumulativeAnnualLeaveEntitlement } from './leave-entitlement.util';
 
 @Injectable()
 export class LeaveService {
@@ -83,20 +84,15 @@ export class LeaveService {
     if (cat.affectsAnnualBalance) {
       if (seniorityYears < 1) {
         // İlk yıl: yıllık izin hakkı henüz doğmamıştır (4857/53).
-        // Bakiye düşülmez; ücretli/ücretsiz kararını onaylayan verir.
+        // Ücretli/ücretsiz kararını onaylayan verir. Ücretsiz seçilirse zaten
+        // bakiyeye dokunulmaz; ÜCRETLİ seçilirse henüz hak edilmemiş bakiyeden
+        // düşülür (bakiye eksiye düşer = borç, ileride birikecek hakedişten
+        // karşılanır).
         requiresPaymentDecision = true;
-        deductFromYear = null;
+        deductFromYear = startYear;
       } else {
-        const balance = await this.prisma.leaveBalance.findUnique({
-          where: {
-            personnelId_year_type: {
-              personnelId,
-              year: startYear,
-              type: LeaveType.ANNUAL,
-            },
-          },
-        });
-        const remaining = balance?.remainingDays ?? 0;
+        // Canlı, hiç sıfırlanmayan kümülatif bakiye (bkz. annualLeaveSummary).
+        const { remaining } = await this.annualLeaveSummary(personnelId, personnel.hireDate);
         if (remaining >= totalDays) {
           // Bakiye yeterli: bu yılki bakiyeden düşülür (normal akış).
           deductFromYear = startYear;
@@ -672,10 +668,100 @@ export class LeaveService {
     });
   }
 
-  myBalance(personnelId: string, year?: number) {
-    return this.prisma.leaveBalance.findMany({
-      where: { personnelId, year: year || new Date().getFullYear() },
+  /**
+   * Yıllık izin hakkı, işe giriş tarihinden bu yana biriken toplam kıdeme göre
+   * CANLI hesaplanır ve hiç sıfırlanmaz (bkz. leave-entitlement.util.ts).
+   * "Kullanılan" miktar, personelin ANNUAL tipli tüm yılların bakiye
+   * satırlarındaki usedDays toplamıdır (hangi yıl satırına yazıldığı önemli
+   * değil, hepsi aynı biriken havuza sayılır).
+   */
+  private async annualLeaveSummary(personnelId: string, hireDate: Date, asOf = new Date()) {
+    const totalEntitled = cumulativeAnnualLeaveEntitlement(hireDate, asOf);
+    const rows = await this.prisma.leaveBalance.findMany({
+      where: { personnelId, type: LeaveType.ANNUAL },
     });
+    const used = rows.reduce((sum, r) => sum + r.usedDays, 0);
+    return { totalEntitled, used, remaining: totalEntitled - used };
+  }
+
+  async myBalance(personnelId: string, year?: number) {
+    const personnel = await this.prisma.personnel.findUnique({
+      where: { id: personnelId },
+      select: { hireDate: true },
+    });
+    if (!personnel) return [];
+
+    const otherRows = await this.prisma.leaveBalance.findMany({
+      where: {
+        personnelId,
+        type: { not: LeaveType.ANNUAL },
+        year: year || new Date().getFullYear(),
+      },
+    });
+
+    const annual = await this.annualLeaveSummary(personnelId, personnel.hireDate);
+    const annualRow = {
+      id: `${personnelId}-ANNUAL`,
+      personnelId,
+      year: new Date().getFullYear(),
+      type: LeaveType.ANNUAL,
+      totalDays: annual.totalEntitled,
+      usedDays: annual.used,
+      remainingDays: annual.remaining,
+    };
+
+    return [annualRow, ...otherRows];
+  }
+
+  /**
+   * HR/Admin: tüm aktif personelin yıllık izin hakedişi, kullanılan/kalan
+   * günleri ve onaylanmış izin tarihleri (Belge: "Savaş ve İK herkesin
+   * iznini görebilsin, diğerleri sadece kendi iznini görsün").
+   */
+  async allAnnualBalances() {
+    const personnel = await this.prisma.personnel.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        employeeNo: true,
+        hireDate: true,
+        department: { select: { name: true } },
+      },
+      orderBy: [{ firstName: 'asc' }],
+    });
+
+    return Promise.all(
+      personnel.map(async (p) => {
+        const annual = await this.annualLeaveSummary(p.id, p.hireDate);
+        const takenLeaves = await this.prisma.leaveRequest.findMany({
+          where: {
+            personnelId: p.id,
+            status: LeaveStatus.APPROVED,
+            OR: [
+              { type: LeaveType.ANNUAL },
+              { category: { affectsAnnualBalance: true } },
+            ],
+          },
+          select: { id: true, startDate: true, endDate: true, totalDays: true },
+          orderBy: { startDate: 'desc' },
+        });
+
+        return {
+          personnelId: p.id,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          employeeNo: p.employeeNo,
+          department: p.department?.name ?? null,
+          hireDate: p.hireDate,
+          totalEntitled: annual.totalEntitled,
+          used: annual.used,
+          remaining: annual.remaining,
+          takenLeaves,
+        };
+      }),
+    );
   }
 
   /**
@@ -716,6 +802,14 @@ export class LeaveService {
    *  - MANAGER (alanın üstü): yalnızca kendi hiyerarşik alt ağacındaki personeller
    *  - Diğer: yalnızca kendisi
    */
+/** İzin listesinde görebileceği personel id'leri (rol/hiyerarşiye göre). null = herkes. */
+  private async leaveListScope(personnelId: string, role: string): Promise<string[] | null> {
+    const seesAll = ['HR', 'ACCOUNTING', 'ADMIN'].includes(role);
+    if (seesAll) return null;
+    const subtree = await this.descendantIds(personnelId);
+    return subtree.length > 0 ? subtree : [personnelId];
+  }
+
   async leaveList(
     personnelId: string,
     role: string,
@@ -736,11 +830,8 @@ export class LeaveService {
       };
     }
 
-    const seesAll = ['HR', 'ACCOUNTING', 'ADMIN'].includes(role);
-    if (!seesAll) {
-      const subtree = await this.descendantIds(personnelId);
-      where.personnelId = subtree.length > 0 ? { in: subtree } : personnelId;
-    }
+    const scope = await this.leaveListScope(personnelId, role);
+    if (scope) where.personnelId = { in: scope };
 
     return this.prisma.leaveRequest.findMany({
       where,
@@ -757,6 +848,26 @@ export class LeaveService {
       },
       orderBy: { startDate: 'desc' },
       take: 500,
+    });
+  }
+
+  /**
+   * İzin Listesi'nde seçilebilecek personel listesi (rol/hiyerarşiye göre) —
+   * izin talebi olsun olmasın, kapsamdaki HERKESİ döner (Savaş/İK her zaman
+   * tüm personeli görsün istendiği için).
+   */
+  async leaveListPersonnel(personnelId: string, role: string) {
+    const scope = await this.leaveListScope(personnelId, role);
+    return this.prisma.personnel.findMany({
+      where: { status: 'ACTIVE', ...(scope ? { id: { in: scope } } : {}) },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        employeeNo: true,
+        department: { select: { name: true } },
+      },
+      orderBy: [{ firstName: 'asc' }],
     });
   }
 

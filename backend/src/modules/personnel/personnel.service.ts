@@ -3,6 +3,7 @@ import { PrismaService } from '../../config/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { CreatePersonnelDto, UpdatePersonnelDto, ResignDto, UpdateEmailDto } from './personnel.dto';
 import { PersonnelStatus, Role } from '@prisma/client';
+import { cumulativeAnnualLeaveEntitlement } from '../leave/leave-entitlement.util';
 
 @Injectable()
 export class PersonnelService {
@@ -48,9 +49,10 @@ export class PersonnelService {
         include: { user: true, department: true, position: true },
       });
 
-      // İzin bakiyesi otomatik hesapla (Belge: Hakediş Hesaplama - kıdeme göre)
-      const seniorityYears = this.calculateSeniorityYears(personnel.hireDate);
-      const annualLeaveDays = this.calculateAnnualLeaveDays(seniorityYears);
+      // İzin bakiyesi otomatik hesapla (Belge: Hakediş Hesaplama - kıdeme göre).
+      // Bu satır sadece kayıt amaçlıdır; gerçek hak ediş her zaman canlı
+      // hesaplanır (bkz. leave.service.ts -> annualLeaveSummary), hiç sıfırlanmaz.
+      const annualLeaveDays = cumulativeAnnualLeaveEntitlement(personnel.hireDate);
 
       await tx.leaveBalance.create({
         data: {
@@ -271,20 +273,4 @@ export class PersonnelService {
     return roots;
   }
 
-  //Yardımcı metodlaR
-  private calculateSeniorityYears(hireDate: Date): number {
-    const diffMs = Date.now() - hireDate.getTime();
-    return diffMs / (365.25 * 24 * 60 * 60 * 1000);
-  }
-
-  /**
-   * 4857 sayılı İş Kanunu Madde 53:
-   * 1-5 yıl: 14 gün, 5-15 yıl: 20 gün, 15+ yıl: 26 gün
-   */
-  private calculateAnnualLeaveDays(seniorityYears: number): number {
-    if (seniorityYears < 1) return 0;
-    if (seniorityYears < 5) return 14;
-    if (seniorityYears < 15) return 20;
-    return 26;
-  }
 }

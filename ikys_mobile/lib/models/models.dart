@@ -255,6 +255,71 @@ class AttendanceOverviewRow {
       );
 }
 
+class TakenLeave {
+  final String id;
+  final DateTime startDate;
+  final DateTime endDate;
+  final double totalDays;
+
+  TakenLeave({
+    required this.id,
+    required this.startDate,
+    required this.endDate,
+    required this.totalDays,
+  });
+
+  factory TakenLeave.fromJson(Map<String, dynamic> j) => TakenLeave(
+        id: j['id'],
+        startDate: DateTime.parse(j['startDate']),
+        endDate: DateTime.parse(j['endDate']),
+        totalDays: (j['totalDays'] as num).toDouble(),
+      );
+}
+
+/// İK/Admin: bir personelin yıllık izin hakedişi/kullanımı ve aldığı izin günleri.
+class LeaveBalanceRow {
+  final String personnelId;
+  final String firstName;
+  final String lastName;
+  final String employeeNo;
+  final String? department;
+  final DateTime hireDate;
+  final double totalEntitled;
+  final double used;
+  final double remaining;
+  final List<TakenLeave> takenLeaves;
+
+  LeaveBalanceRow({
+    required this.personnelId,
+    required this.firstName,
+    required this.lastName,
+    required this.employeeNo,
+    this.department,
+    required this.hireDate,
+    required this.totalEntitled,
+    required this.used,
+    required this.remaining,
+    required this.takenLeaves,
+  });
+
+  String get fullName => '$firstName $lastName';
+
+  factory LeaveBalanceRow.fromJson(Map<String, dynamic> j) => LeaveBalanceRow(
+        personnelId: j['personnelId'],
+        firstName: j['firstName'],
+        lastName: j['lastName'],
+        employeeNo: j['employeeNo'],
+        department: j['department'],
+        hireDate: DateTime.parse(j['hireDate']),
+        totalEntitled: (j['totalEntitled'] as num).toDouble(),
+        used: (j['used'] as num).toDouble(),
+        remaining: (j['remaining'] as num).toDouble(),
+        takenLeaves: (j['takenLeaves'] as List)
+            .map((e) => TakenLeave.fromJson(e))
+            .toList(),
+      );
+}
+
 class MessageRecipient {
   final String id;
   final String firstName;
@@ -336,6 +401,7 @@ class PendingApproval {
 
 class LeaveListItem {
   final String id;
+  final String personnelId;
   final String personName;
   final String employeeNo;
   final String? department;
@@ -348,6 +414,7 @@ class LeaveListItem {
 
   LeaveListItem({
     required this.id,
+    required this.personnelId,
     required this.personName,
     required this.employeeNo,
     this.department,
@@ -364,6 +431,7 @@ class LeaveListItem {
     final cat = j['category'];
     return LeaveListItem(
       id: j['id'],
+      personnelId: j['personnelId'],
       personName: '${p['firstName'] ?? ''} ${p['lastName'] ?? ''}'.trim(),
       employeeNo: p['employeeNo'] ?? '',
       department: p['department']?['name'],
@@ -375,6 +443,33 @@ class LeaveListItem {
       paymentType: j['paymentType'],
     );
   }
+}
+
+/// İzin Listesi'nde seçilebilecek personel (bkz. LeaveListService.personnel).
+class LeavePersonnelRow {
+  final String id;
+  final String firstName;
+  final String lastName;
+  final String employeeNo;
+  final String? department;
+
+  LeavePersonnelRow({
+    required this.id,
+    required this.firstName,
+    required this.lastName,
+    required this.employeeNo,
+    this.department,
+  });
+
+  String get fullName => '$firstName $lastName';
+
+  factory LeavePersonnelRow.fromJson(Map<String, dynamic> j) => LeavePersonnelRow(
+        id: j['id'],
+        firstName: j['firstName'],
+        lastName: j['lastName'],
+        employeeNo: j['employeeNo'],
+        department: j['department']?['name'],
+      );
 }
 
 class AdminCategory {

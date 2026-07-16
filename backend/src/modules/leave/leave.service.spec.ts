@@ -3,8 +3,11 @@ import { LeaveType, LeaveStatus } from '@prisma/client';
 
 /**
  * "İlk yıl izin kuralı" (bkz. backend/STEPS.md):
- *  - Kıdemi 1 yıldan az olan personel yıllık izin isterse bakiye düşülmez,
- *    ödeme tipi (ücretli/ücretsiz) kararı onaylayana bırakılır.
+ *  - Kıdemi 1 yıldan az olan personel yıllık izin isterse ödeme tipi
+ *    (ücretli/ücretsiz) kararı onaylayana bırakılır. Ücretsiz onaylanırsa
+ *    bakiyeye dokunulmaz; ÜCRETLİ onaylanırsa henüz hak edilmemiş bakiyeden
+ *    düşülür (borca düşer, ileride birikecek hakedişten karşılanır) — bu
+ *    yüzden deductFromYear yine de set edilir.
  *  - Kıdemi 1+ yıl olan personel için bakiye yeterliyse o yıldan düşülür;
  *    yetersizse talep engellenmez, gelecek yılın bakiyesinden düşülmek üzere
  *    ödeme tipi kararı onaylayana bırakılır.
@@ -19,7 +22,7 @@ describe('LeaveService - ilk yıl izin kuralı', () => {
     status: 'ACTIVE',
   });
 
-  function buildService(personnel: ReturnType<typeof makePersonnel>, remainingDays = 0) {
+  function buildService(personnel: ReturnType<typeof makePersonnel>, usedDays = 0) {
     const prisma = {
       personnel: {
         findUnique: jest.fn().mockResolvedValue(personnel),
@@ -32,7 +35,8 @@ describe('LeaveService - ilk yıl izin kuralı', () => {
         findUnique: jest.fn().mockResolvedValue(null), // eski enum fallback'ine düşsün
       },
       leaveBalance: {
-        findUnique: jest.fn().mockResolvedValue({ remainingDays }),
+        // annualLeaveSummary(): kümülatif hakediş - tüm yılların usedDays toplamı
+        findMany: jest.fn().mockResolvedValue(usedDays > 0 ? [{ usedDays }] : []),
       },
       $transaction: jest.fn(async (cb: any) =>
         cb({
@@ -46,7 +50,7 @@ describe('LeaveService - ilk yıl izin kuralı', () => {
     return { prisma, notifications, service: new LeaveService(prisma as any, notifications as any) };
   }
 
-  it('kıdemi 1 yıldan az personel için bakiye düşülmez, ödeme kararı onaylayana bırakılır', async () => {
+  it('kıdemi 1 yıldan az personel için ödeme kararı onaylayana bırakılır (ücretliyse borca düşebilir)', async () => {
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     const { service, prisma } = buildService(makePersonnel(oneMonthAgo));
@@ -73,12 +77,13 @@ describe('LeaveService - ilk yıl izin kuralı', () => {
     } as any);
 
     expect(captured[0].requiresPaymentDecision).toBe(true);
-    expect(captured[0].deductFromYear).toBeNull();
+    expect(captured[0].deductFromYear).toBe(2026);
   });
 
   it('kıdemi 1+ yıl ve bakiyesi yeterli personel için o yılın bakiyesinden düşülür', async () => {
     const twoYearsAgo = new Date();
     twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+    // 2 yıl kıdem = 28 gün kümülatif hak; 10'u kullanılmış, 18 gün kalmış (yeterli).
     const { service, prisma } = buildService(makePersonnel(twoYearsAgo), 10);
 
     const captured: any[] = [];
@@ -109,7 +114,8 @@ describe('LeaveService - ilk yıl izin kuralı', () => {
   it('kıdemi 1+ yıl ama bakiyesi yetersiz personel için talep engellenmez, gelecek yıldan düşülmek üzere işaretlenir', async () => {
     const twoYearsAgo = new Date();
     twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-    const { service, prisma } = buildService(makePersonnel(twoYearsAgo), 1);
+    // 2 yıl kıdem = 28 gün kümülatif hak; 27'si kullanılmış, sadece 1 gün kalmış (yetersiz).
+    const { service, prisma } = buildService(makePersonnel(twoYearsAgo), 27);
 
     const captured: any[] = [];
     prisma.$transaction = jest.fn(async (cb: any) => {

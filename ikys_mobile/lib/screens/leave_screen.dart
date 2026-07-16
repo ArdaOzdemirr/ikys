@@ -43,6 +43,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
   List<LeaveBalance> _balances = [];
   List<LeaveRequest> _requests = [];
   bool _loading = true;
+  String? _monthFilter; // null = tüm aylar, aksi halde "yyyy-MM"
 
   @override
   void initState() {
@@ -165,15 +166,50 @@ class _LeaveScreenState extends State<LeaveScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text('Taleplerim', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Taleplerim', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              _monthDropdown(),
+            ],
+          ),
           const SizedBox(height: 10),
-          if (_requests.isEmpty)
-            const Text('Henüz izin talebin yok.',
-                style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))
+          if (_filteredRequests.isEmpty)
+            Text(
+              _monthFilter == null ? 'Henüz izin talebin yok.' : 'Bu ayda talebin yok.',
+              style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+            )
           else
-            ..._requests.map(_requestCard),
+            ..._filteredRequests.map(_requestCard),
         ],
       ),
+    );
+  }
+
+  List<LeaveRequest> get _filteredRequests {
+    if (_monthFilter == null) return _requests;
+    return _requests
+        .where((r) => DateFormat('yyyy-MM').format(r.startDate) == _monthFilter)
+        .toList();
+  }
+
+  Widget _monthDropdown() {
+    final months = _requests.map((r) => DateFormat('yyyy-MM').format(r.startDate)).toSet().toList()
+      ..sort((a, b) => b.compareTo(a));
+    if (months.isEmpty) return const SizedBox.shrink();
+    return DropdownButton<String?>(
+      value: _monthFilter,
+      underline: const SizedBox.shrink(),
+      hint: const Text('Tüm Aylar', style: TextStyle(fontSize: 13)),
+      style: const TextStyle(fontSize: 13, color: Colors.black87),
+      items: [
+        const DropdownMenuItem<String?>(value: null, child: Text('Tüm Aylar')),
+        ...months.map((m) => DropdownMenuItem<String?>(
+              value: m,
+              child: Text(DateFormat('MMMM yyyy', 'tr_TR').format(DateFormat('yyyy-MM').parse(m))),
+            )),
+      ],
+      onChanged: (v) => setState(() => _monthFilter = v),
     );
   }
 
@@ -231,9 +267,10 @@ class _LeaveScreenState extends State<LeaveScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            '${DateFormat('dd MMM').format(r.startDate)} – '
-            '${DateFormat('dd MMM yyyy').format(r.endDate)} · ${r.totalDays.toStringAsFixed(0)} gün',
-            style: const TextStyle(color: Color(0xFF374151)),
+            '${DateFormat('dd.MM.yyyy').format(r.startDate)} / '
+            '${DateFormat('dd.MM.yyyy').format(r.endDate)} arası izinli · '
+            '${r.totalDays.toStringAsFixed(0)} gün',
+            style: const TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w500),
           ),
           if (r.requiresPaymentDecision && r.status == 'PENDING')
             const Padding(
@@ -245,7 +282,11 @@ class _LeaveScreenState extends State<LeaveScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(r.paymentType == 'PAID' ? 'Ücretli izin' : 'Ücretsiz izin',
-                  style: const TextStyle(color: Color(0xFF166534), fontSize: 13, fontWeight: FontWeight.w600)),
+                  style: TextStyle(
+                    color: r.paymentType == 'UNPAID' ? const Color(0xFFDC2626) : const Color(0xFF166534),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  )),
             ),
           if (r.reason != null && r.reason!.isNotEmpty)
             Padding(

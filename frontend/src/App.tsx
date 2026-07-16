@@ -27,6 +27,9 @@ import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import LeaveCategoriesPage from './pages/LeaveCategoriesPage';
 import LeaveListPage from './pages/LeaveListPage';
+import LeaveListDetailPage from './pages/LeaveListDetailPage';
+import LeaveBalancesPage from './pages/LeaveBalancesPage';
+import LeaveBalanceDetailPage from './pages/LeaveBalanceDetailPage';
 
 export default function App() {
   const { loading } = useAuth();
@@ -55,6 +58,9 @@ export default function App() {
         <Route path="/leave" element={<LeavePage />} />
         <Route path="/leave/approvals" element={<LeaveApprovalPage />} />
         <Route path="/leave/list" element={<LeaveListPage />} />
+        <Route path="/leave/list/:personnelId" element={<LeaveListDetailPage />} />
+        <Route path="/leave/balances" element={<LeaveBalancesPage />} />
+        <Route path="/leave/balances/:personnelId" element={<LeaveBalanceDetailPage />} />
         <Route path="/leave/categories" element={<LeaveCategoriesPage />} />
         <Route path="/leave/holidays" element={<HolidaysPage />} />
         <Route path="/payroll" element={<PayrollPage />} />

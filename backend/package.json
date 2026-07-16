@@ -13,6 +13,8 @@
     "reset:real-accounts": "ts-node prisma/reset-real-accounts.ts",
     "add:hr": "ts-node prisma/add-hr-account.ts",
     "assign:shift": "ts-node prisma/assign-standard-shift.ts",
+    "import:leave-history": "ts-node prisma/import-leave-history.ts",
+    "fix:leave-data": "ts-node prisma/fix-leave-data.ts",
     "prisma:studio": "prisma studio",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest"

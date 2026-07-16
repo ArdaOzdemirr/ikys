@@ -17,9 +17,16 @@ const LEAVE_TYPES = [
   { value: 'UNPAID', label: 'Ücretsiz İzin' },
 ];
 
+function formatRange(startDate: string, endDate: string, totalDays: number) {
+  const s = new Date(startDate).toLocaleDateString('tr-TR');
+  const e = new Date(endDate).toLocaleDateString('tr-TR');
+  return `${s} / ${e} arası izinli · ${totalDays} gün`;
+}
+
 export default function LeavePage() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [month, setMonth] = useState(''); // "" = tüm aylar, aksi halde "YYYY-MM"
   const [form, setForm] = useState({
     type: 'ANNUAL', startDate: '', endDate: '', reason: '',
   });
@@ -164,29 +171,47 @@ export default function LeavePage() {
 
       {/* Geçmiş */}
       <div className="card overflow-x-auto p-0">
-        <h3 className="font-semibold p-4 border-b border-gray-200">Talep Geçmişi</h3>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h3 className="font-semibold">Talep Geçmişi</h3>
+          <div className="flex items-center gap-2">
+            <input
+              type="month"
+              className="input w-auto"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+            {month && (
+              <button onClick={() => setMonth('')} className="text-xs text-gray-500 hover:underline">
+                Temizle
+              </button>
+            )}
+          </div>
+        </div>
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr className="text-left text-xs text-gray-500 uppercase">
               <th className="px-4 py-3">Tip</th>
-              <th className="px-4 py-3">Başlangıç</th>
-              <th className="px-4 py-3">Bitiş</th>
-              <th className="px-4 py-3">Gün</th>
+              <th className="px-4 py-3">Tarih</th>
               <th className="px-4 py-3">Durum</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {requests?.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Talep yok</td></tr>
-            ) : requests?.map((r: any) => (
+            {(() => {
+              const filtered = (requests ?? []).filter(
+                (r: any) => !month || r.startDate.slice(0, 7) === month,
+              );
+              if (filtered.length === 0) {
+                return <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">Talep yok</td></tr>;
+              }
+              return filtered.map((r: any) => (
               <tr key={r.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm">
                   {LEAVE_TYPES.find((t) => t.value === r.type)?.label || r.type}
                 </td>
-                <td className="px-4 py-3 text-sm">{new Date(r.startDate).toLocaleDateString('tr-TR')}</td>
-                <td className="px-4 py-3 text-sm">{new Date(r.endDate).toLocaleDateString('tr-TR')}</td>
-                <td className="px-4 py-3 text-sm font-medium">{r.totalDays}</td>
+                <td className="px-4 py-3 text-sm font-medium">
+                  {formatRange(r.startDate, r.endDate, r.totalDays)}
+                </td>
                 <td className="px-4 py-3">
                   <LeaveStatusBadge status={r.status} />
                   {r.status === 'PENDING' && r.approvalSteps?.length > 0 && (
@@ -206,7 +231,7 @@ export default function LeavePage() {
                     <p className="text-xs text-red-500 mt-1">{r.rejectionReason}</p>
                   )}
                   {r.status === 'APPROVED' && r.paymentType && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className={`text-xs mt-1 ${r.paymentType === 'UNPAID' ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                       {r.paymentType === 'PAID' ? 'Ücretli' : 'Ücretsiz'}
                     </p>
                   )}
@@ -252,7 +277,8 @@ export default function LeavePage() {
                   </div>
                 </td>
               </tr>
-            ))}
+              ));
+            })()}
           </tbody>
         </table>
       </div>

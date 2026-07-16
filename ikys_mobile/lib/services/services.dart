@@ -120,6 +120,12 @@ class LeaveService {
   static Future<void> remove(String id) async {
     await ApiClient.instance.dio.delete('/leave/requests/$id/remove');
   }
+
+  /// İK/Admin: tüm aktif personelin yıllık izin hakedişi/kullanımı.
+  static Future<List<LeaveBalanceRow>> allBalances() async {
+    final res = await ApiClient.instance.dio.get('/leave/balance/all');
+    return (res.data as List).map((e) => LeaveBalanceRow.fromJson(e)).toList();
+  }
 }
 
 class NotificationService {
@@ -233,6 +239,12 @@ class LeaveListService {
       if (year != null) 'year': year,
     });
     return (res.data as List).map((e) => LeaveListItem.fromJson(e)).toList();
+  }
+
+  /// İzin Listesi'nde seçilebilecek personel (role/hiyerarşiye göre).
+  static Future<List<LeavePersonnelRow>> personnel() async {
+    final res = await ApiClient.instance.dio.get('/leave/list/personnel');
+    return (res.data as List).map((e) => LeavePersonnelRow.fromJson(e)).toList();
   }
 }
 

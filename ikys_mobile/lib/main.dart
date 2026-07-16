@@ -17,8 +17,7 @@ import 'router.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseBgHandler(RemoteMessage message) async {}
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+Future<void> _startup() async {
   await initializeDateFormatting('tr_TR');
   Intl.defaultLocale = 'tr_TR';
   try {
@@ -35,7 +34,53 @@ Future<void> main() async {
     // Firebase yapılandırması yoksa (ör. iOS'ta GoogleService-Info.plist
     // eksikse) push devre dışı kalsın, uygulama yine de açılsın
   }
-  runApp(const IkysApp());
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  Object? startupError;
+  try {
+    // Açılışta bir şey donarsa (ağ, secure storage vb.) uygulama sonsuza
+    // kadar beyaz ekranda kalmasın; en geç 10 saniyede hataya düşsün.
+    await _startup().timeout(const Duration(seconds: 10));
+  } catch (e) {
+    startupError = e;
+  }
+  runApp(startupError == null
+      ? const IkysApp()
+      : _StartupErrorApp(error: startupError));
+}
+
+/// Açılış sırasında beklenmeyen bir hata/zaman aşımı olursa beyaz ekran
+/// yerine sebebini gösterir (ekran görüntüsüyle bize iletilebilsin diye).
+class _StartupErrorApp extends StatelessWidget {
+  final Object error;
+  const _StartupErrorApp({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Uygulama açılırken bir sorun oluştu',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 12),
+                SelectableText('$error'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class IkysApp extends StatefulWidget {

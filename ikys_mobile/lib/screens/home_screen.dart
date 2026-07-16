@@ -134,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(child: _statCard(
                   'Yıllık İzin',
                   _annual != null
-                      ? '${_annual!.remainingDays.toStringAsFixed(0)} gün kaldı'
+                      ? '${formatDays(_annual!.remainingDays)} gün kaldı'
                       : '-',
                   Icons.beach_access,
                   const Color(0xFF16A34A),

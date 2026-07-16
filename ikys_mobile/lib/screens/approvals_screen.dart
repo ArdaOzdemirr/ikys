@@ -219,7 +219,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 6),
           Text(
-            '${a.leaveName} · ${a.totalDays.toStringAsFixed(0)} gün\n'
+            '${a.leaveName} · ${formatDays(a.totalDays)} gün\n'
             '${DateFormat('dd MMM').format(a.startDate)} – '
             '${DateFormat('dd MMM yyyy').format(a.endDate)}',
             style: const TextStyle(color: Color(0xFF374151)),
@@ -291,7 +291,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            '${a.leaveName} · ${a.totalDays.toStringAsFixed(0)} gün\n'
+            '${a.leaveName} · ${formatDays(a.totalDays)} gün\n'
             '${DateFormat('dd MMM').format(a.startDate)} – '
             '${DateFormat('dd MMM yyyy').format(a.endDate)}',
             style: const TextStyle(color: Color(0xFF374151)),

@@ -77,7 +77,7 @@ class _LeaveBalancesScreenState extends State<LeaveBalancesScreen> {
               color: const Color(0xFFEFF6FF),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Text('${r.remaining.toStringAsFixed(0)} gün kaldı',
+            child: Text('${formatDays(r.remaining)} gün kaldı',
                 style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 12, fontWeight: FontWeight.w600)),
           ),
           const Icon(Icons.chevron_right, color: Colors.grey),

@@ -78,7 +78,7 @@ class _LeaveBalanceDetailScreenState extends State<LeaveBalanceDetailScreen> {
                   child: Text(
                     '${DateFormat('dd.MM.yyyy').format(l.startDate)} / '
                     '${DateFormat('dd.MM.yyyy').format(l.endDate)} arası izinli · '
-                    '${l.totalDays.toStringAsFixed(0)} gün',
+                    '${formatDays(l.totalDays)} gün',
                     style: const TextStyle(fontSize: 14),
                   ),
                 )),
@@ -97,7 +97,7 @@ class _LeaveBalanceDetailScreenState extends State<LeaveBalanceDetailScreen> {
       child: Column(
         children: [
           Text(
-            value.toStringAsFixed(0),
+            formatDays(value),
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,

@@ -243,13 +243,13 @@ class _LeaveScreenState extends State<LeaveScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(b.remainingDays.toStringAsFixed(0),
+          Text(formatDays(b.remainingDays),
               style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Color(0xFF1D4ED8))),
           const Text('gün kaldı', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 12)),
           const SizedBox(height: 8),
           Text(_typeLabels[b.type] ?? b.type,
               style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E3A8A))),
-          Text('${b.usedDays.toStringAsFixed(0)}/${b.totalDays.toStringAsFixed(0)} kullanıldı',
+          Text('${formatDays(b.usedDays)}/${formatDays(b.totalDays)} kullanıldı',
               style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 12)),
         ],
       ),
@@ -288,7 +288,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
           Text(
             '${DateFormat('dd.MM.yyyy').format(r.startDate)} / '
             '${DateFormat('dd.MM.yyyy').format(r.endDate)} arası izinli · '
-            '${r.totalDays.toStringAsFixed(0)} gün',
+            '${formatDays(r.totalDays)} gün',
             style: const TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w500),
           ),
           if (r.requiresPaymentDecision && r.status == 'PENDING')

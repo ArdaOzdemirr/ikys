@@ -216,14 +216,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 2),
               Text(
-                  'Kullanılan: ${b.usedDays.toStringAsFixed(0)} / ${b.totalDays.toStringAsFixed(0)} gün',
+                  'Kullanılan: ${formatDays(b.usedDays)} / ${formatDays(b.totalDays)} gün',
                   style: const TextStyle(color: Colors.grey, fontSize: 12)),
             ],
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(b.remainingDays.toStringAsFixed(0),
+              Text(formatDays(b.remainingDays),
                   style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,

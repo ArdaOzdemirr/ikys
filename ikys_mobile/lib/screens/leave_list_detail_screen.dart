@@ -173,7 +173,7 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
           Text(
             '${DateFormat('dd.MM.yyyy').format(r.startDate)} / '
             '${DateFormat('dd.MM.yyyy').format(r.endDate)} arası izinli · '
-            '${r.totalDays.toStringAsFixed(0)} gün',
+            '${formatDays(r.totalDays)} gün',
             style: const TextStyle(color: Color(0xFF374151)),
           ),
           if (r.paymentType != null)

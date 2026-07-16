@@ -1,5 +1,15 @@
 // Backend cevaplarını karşılayan modeller.
 
+/// Gün sayılarını gösterirken tam sayıları küsuratsız (26), küsuratlı
+/// olanları (43.5, 0.25 gibi) yuvarlamadan gösterir.
+String formatDays(double d) {
+  if (d == d.roundToDouble()) return d.toStringAsFixed(0);
+  var s = d.toStringAsFixed(2);
+  s = s.replaceAll(RegExp(r'0+$'), '');
+  s = s.replaceAll(RegExp(r'\.$'), '');
+  return s;
+}
+
 class User {
   final String id;
   final String email;

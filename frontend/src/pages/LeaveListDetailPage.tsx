@@ -4,6 +4,19 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { ArrowLeft, ListChecks } from 'lucide-react';
 
+const TYPE_LABELS: Record<string, string> = {
+  ANNUAL: 'Yıllık İzin',
+  HALF_DAY: 'Yarım Gün',
+  HOURLY: 'Saatlik',
+  EXCUSE: 'Mazeret',
+  SICK: 'Sağlık Raporu',
+  MATERNITY: 'Doğum İzni',
+  PATERNITY: 'Babalık İzni',
+  MARRIAGE: 'Evlilik İzni',
+  BEREAVEMENT: 'Vefat İzni',
+  UNPAID: 'Ücretsiz İzin',
+};
+
 const statusLabel: Record<string, { label: string; cls: string }> = {
   APPROVED: { label: 'Onaylandı', cls: 'bg-green-100 text-green-700' },
   PENDING: { label: 'Beklemede', cls: 'bg-amber-100 text-amber-700' },
@@ -33,9 +46,9 @@ export default function LeaveListDetailPage() {
     queryFn: () => api.get('/leave/list', { status, year: yr || undefined }),
   });
 
-  const mine = (rows ?? []).filter(
-    (r) => r.personnelId === personnelId && (!month || new Date(r.startDate).getMonth() + 1 === +month),
-  );
+  const mine = (rows ?? [])
+    .filter((r) => r.personnelId === personnelId && (!month || new Date(r.startDate).getMonth() + 1 === +month))
+    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
   const person = mine[0]?.personnel;
 
   return (
@@ -99,7 +112,9 @@ export default function LeaveListDetailPage() {
               const s = statusLabel[r.status] || statusLabel.PENDING;
               return (
                 <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm">{r.category?.name || r.type || '-'}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {r.category?.name || (r.type ? TYPE_LABELS[r.type] ?? r.type : '-')}
+                  </td>
                   <td className="px-4 py-3 text-sm">{fmt(r.startDate)}</td>
                   <td className="px-4 py-3 text-sm">{fmt(r.endDate)}</td>
                   <td className="px-4 py-3 text-sm font-medium">{r.totalDays}</td>

@@ -17,6 +17,11 @@ const LEAVE_TYPES = [
   { value: 'UNPAID', label: 'Ücretsiz İzin' },
 ];
 
+const MONTHS = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+];
+
 function formatRange(startDate: string, endDate: string, totalDays: number) {
   const s = new Date(startDate).toLocaleDateString('tr-TR');
   const e = new Date(endDate).toLocaleDateString('tr-TR');
@@ -26,7 +31,8 @@ function formatRange(startDate: string, endDate: string, totalDays: number) {
 export default function LeavePage() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [month, setMonth] = useState(''); // "" = tüm aylar, aksi halde "YYYY-MM"
+  const [year, setYear] = useState(''); // "" = tüm yıllar
+  const [month, setMonth] = useState(''); // "" = tüm aylar, aksi halde "1".."12"
   const [form, setForm] = useState({
     type: 'ANNUAL', startDate: '', endDate: '', reason: '',
   });
@@ -174,14 +180,21 @@ export default function LeavePage() {
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h3 className="font-semibold">Talep Geçmişi</h3>
           <div className="flex items-center gap-2">
-            <input
-              type="month"
-              className="input w-auto"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-            />
-            {month && (
-              <button onClick={() => setMonth('')} className="text-xs text-gray-500 hover:underline">
+            <select className="input w-auto" value={year} onChange={(e) => setYear(e.target.value)}>
+              <option value="">Tüm yıllar</option>
+              {[0, 1, 2, 3, 4].map((i) => {
+                const y = new Date().getFullYear() - i;
+                return <option key={y} value={y}>{y}</option>;
+              })}
+            </select>
+            <select className="input w-auto" value={month} onChange={(e) => setMonth(e.target.value)}>
+              <option value="">Tüm aylar</option>
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i + 1}>{m}</option>
+              ))}
+            </select>
+            {(year || month) && (
+              <button onClick={() => { setYear(''); setMonth(''); }} className="text-xs text-gray-500 hover:underline">
                 Temizle
               </button>
             )}
@@ -198,9 +211,11 @@ export default function LeavePage() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {(() => {
-              const filtered = (requests ?? []).filter(
-                (r: any) => !month || r.startDate.slice(0, 7) === month,
-              );
+              const filtered = (requests ?? []).filter((r: any) => {
+                if (year && r.startDate.slice(0, 4) !== year) return false;
+                if (month && +r.startDate.slice(5, 7) !== +month) return false;
+                return true;
+              });
               if (filtered.length === 0) {
                 return <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">Talep yok</td></tr>;
               }

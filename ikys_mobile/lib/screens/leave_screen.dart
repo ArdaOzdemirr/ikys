@@ -43,7 +43,8 @@ class _LeaveScreenState extends State<LeaveScreen> {
   List<LeaveBalance> _balances = [];
   List<LeaveRequest> _requests = [];
   bool _loading = true;
-  String? _monthFilter; // null = tüm aylar, aksi halde "yyyy-MM"
+  int? _yearFilter; // null = tüm yıllar
+  int? _monthFilter; // null = tüm aylar
 
   @override
   void initState() {
@@ -170,13 +171,15 @@ class _LeaveScreenState extends State<LeaveScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Taleplerim', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              _monthDropdown(),
+              Row(mainAxisSize: MainAxisSize.min, children: [_yearDropdown(), _monthDropdown()]),
             ],
           ),
           const SizedBox(height: 10),
           if (_filteredRequests.isEmpty)
             Text(
-              _monthFilter == null ? 'Henüz izin talebin yok.' : 'Bu ayda talebin yok.',
+              (_yearFilter == null && _monthFilter == null)
+                  ? 'Henüz izin talebin yok.'
+                  : 'Bu dönemde talebin yok.',
               style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
             )
           else
@@ -187,26 +190,41 @@ class _LeaveScreenState extends State<LeaveScreen> {
   }
 
   List<LeaveRequest> get _filteredRequests {
-    if (_monthFilter == null) return _requests;
-    return _requests
-        .where((r) => DateFormat('yyyy-MM').format(r.startDate) == _monthFilter)
-        .toList();
+    return _requests.where((r) {
+      if (_yearFilter != null && r.startDate.year != _yearFilter) return false;
+      if (_monthFilter != null && r.startDate.month != _monthFilter) return false;
+      return true;
+    }).toList();
+  }
+
+  Widget _yearDropdown() {
+    final years = _requests.map((r) => r.startDate.year).toSet().toList()..sort((a, b) => b.compareTo(a));
+    if (years.isEmpty) return const SizedBox.shrink();
+    return DropdownButton<int?>(
+      value: _yearFilter,
+      underline: const SizedBox.shrink(),
+      hint: const Text('Tüm Yıllar', style: TextStyle(fontSize: 13)),
+      style: const TextStyle(fontSize: 13, color: Colors.black87),
+      items: [
+        const DropdownMenuItem<int?>(value: null, child: Text('Tüm Yıllar')),
+        ...years.map((y) => DropdownMenuItem<int?>(value: y, child: Text('$y'))),
+      ],
+      onChanged: (v) => setState(() => _yearFilter = v),
+    );
   }
 
   Widget _monthDropdown() {
-    final months = _requests.map((r) => DateFormat('yyyy-MM').format(r.startDate)).toSet().toList()
-      ..sort((a, b) => b.compareTo(a));
-    if (months.isEmpty) return const SizedBox.shrink();
-    return DropdownButton<String?>(
+    if (_requests.isEmpty) return const SizedBox.shrink();
+    return DropdownButton<int?>(
       value: _monthFilter,
       underline: const SizedBox.shrink(),
       hint: const Text('Tüm Aylar', style: TextStyle(fontSize: 13)),
       style: const TextStyle(fontSize: 13, color: Colors.black87),
       items: [
-        const DropdownMenuItem<String?>(value: null, child: Text('Tüm Aylar')),
-        ...months.map((m) => DropdownMenuItem<String?>(
+        const DropdownMenuItem<int?>(value: null, child: Text('Tüm Aylar')),
+        ...List.generate(12, (i) => i + 1).map((m) => DropdownMenuItem<int?>(
               value: m,
-              child: Text(DateFormat('MMMM yyyy', 'tr_TR').format(DateFormat('yyyy-MM').parse(m))),
+              child: Text(DateFormat('MMMM', 'tr_TR').format(DateTime(2000, m))),
             )),
       ],
       onChanged: (v) => setState(() => _monthFilter = v),

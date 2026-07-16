@@ -399,6 +399,19 @@ class PendingApproval {
 
 // ============ İzin Listesi & Kategori Yönetimi (mobil) ============
 
+const leaveTypeLabels = {
+  'ANNUAL': 'Yıllık İzin',
+  'HALF_DAY': 'Yarım Gün',
+  'HOURLY': 'Saatlik',
+  'EXCUSE': 'Mazeret',
+  'SICK': 'Sağlık Raporu',
+  'MATERNITY': 'Doğum İzni',
+  'PATERNITY': 'Babalık İzni',
+  'MARRIAGE': 'Evlilik İzni',
+  'BEREAVEMENT': 'Vefat İzni',
+  'UNPAID': 'Ücretsiz İzin',
+};
+
 class LeaveListItem {
   final String id;
   final String personnelId;
@@ -435,7 +448,9 @@ class LeaveListItem {
       personName: '${p['firstName'] ?? ''} ${p['lastName'] ?? ''}'.trim(),
       employeeNo: p['employeeNo'] ?? '',
       department: p['department']?['name'],
-      leaveName: cat != null ? cat['name'] : (j['type'] ?? 'İzin'),
+      leaveName: cat != null
+          ? cat['name']
+          : (j['type'] != null ? (leaveTypeLabels[j['type']] ?? j['type']) : 'İzin'),
       startDate: DateTime.parse(j['startDate']),
       endDate: DateTime.parse(j['endDate']),
       totalDays: (j['totalDays'] as num).toDouble(),

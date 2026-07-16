@@ -605,7 +605,7 @@ export class LeaveService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { startDate: 'desc' },
     });
   }
 

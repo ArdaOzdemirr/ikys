@@ -55,7 +55,8 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
   List<LeaveListItem> get _filtered => _items
       .where((r) =>
           r.personnelId == widget.personnel.id && (_month == null || r.startDate.month == _month))
-      .toList();
+      .toList()
+    ..sort((a, b) => a.startDate.compareTo(b.startDate));
 
   @override
   Widget build(BuildContext context) {

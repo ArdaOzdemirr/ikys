@@ -27,13 +27,11 @@ Future<void> _startup() async {
     // Firebase yapılandırması yoksa uygulama yine de açılsın
   }
   await ApiClient.instance.init();
-  try {
-    await LocalNotifications.init();
-    await PushService.init();
-  } catch (_) {
-    // Firebase yapılandırması yoksa (ör. iOS'ta GoogleService-Info.plist
-    // eksikse) push devre dışı kalsın, uygulama yine de açılsın
-  }
+  // LocalNotifications/PushService init() burada ÇAĞRILMIYOR: ikisi de
+  // (iOS'ta) sistem bildirim izni diyaloğu açar. İlk frame çizilmeden önce
+  // bu diyalog istenirse iOS'ta bazen hiç tamamlanmıyor ve await sonsuza
+  // kadar asılı kalıyor (uygulama beyaz ekranda takılıyor). Bu yüzden ilk
+  // frame'den sonra, IkysApp.initState()'te tetikleniyorlar.
 }
 
 Future<void> main() async {
@@ -102,6 +100,18 @@ class _IkysAppState extends State<IkysApp> {
     ApiClient.instance.onForceLogout = auth.forceLogout;
     auth.bootstrap();
     router = createRouter(auth);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initPushAfterFirstFrame());
+  }
+
+  /// Bildirim izni diyaloğunu ilk frame çizildikten sonra ister (bkz. _startup()).
+  Future<void> _initPushAfterFirstFrame() async {
+    try {
+      await LocalNotifications.init();
+      await PushService.init();
+    } catch (_) {
+      // Firebase yapılandırması yoksa (ör. iOS'ta GoogleService-Info.plist
+      // eksikse) push devre dışı kalsın, uygulama yine de çalışsın
+    }
   }
 
   @override

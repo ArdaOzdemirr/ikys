@@ -211,11 +211,13 @@ export default function LeavePage() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {(() => {
-              const filtered = (requests ?? []).filter((r: any) => {
-                if (year && r.startDate.slice(0, 4) !== year) return false;
-                if (month && +r.startDate.slice(5, 7) !== +month) return false;
-                return true;
-              });
+              const filtered = (requests ?? [])
+                .filter((r: any) => {
+                  if (year && r.startDate.slice(0, 4) !== year) return false;
+                  if (month && +r.startDate.slice(5, 7) !== +month) return false;
+                  return true;
+                })
+                .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
               if (filtered.length === 0) {
                 return <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">Talep yok</td></tr>;
               }

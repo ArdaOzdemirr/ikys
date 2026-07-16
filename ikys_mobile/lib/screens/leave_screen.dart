@@ -194,7 +194,8 @@ class _LeaveScreenState extends State<LeaveScreen> {
       if (_yearFilter != null && r.startDate.year != _yearFilter) return false;
       if (_monthFilter != null && r.startDate.month != _monthFilter) return false;
       return true;
-    }).toList();
+    }).toList()
+      ..sort((a, b) => a.startDate.compareTo(b.startDate));
   }
 
   Widget _yearDropdown() {

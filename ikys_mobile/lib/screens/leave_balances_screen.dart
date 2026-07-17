@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
 import '../services/services.dart';
-import 'leave_balance_detail_screen.dart';
 
-/// İK/Admin: personel seç, sonra o kişinin izin detayına gir.
+/// İK/Admin: tüm personelin yıllık izin kalan günü (kimin hangi tarihlerde
+/// izin aldığı zaten "İzin Listesi"nde var, burada tekrar edilmiyor).
 class LeaveBalancesScreen extends StatefulWidget {
   const LeaveBalancesScreen({super.key});
 
@@ -68,23 +68,14 @@ class _LeaveBalancesScreenState extends State<LeaveBalancesScreen> {
       subtitle: Text(
         [r.department, r.employeeNo].where((e) => e != null && e.isNotEmpty).join(' · '),
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text('${formatDays(r.remaining)} gün kaldı',
-                style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 12, fontWeight: FontWeight.w600)),
-          ),
-          const Icon(Icons.chevron_right, color: Colors.grey),
-        ],
-      ),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => LeaveBalanceDetailScreen(row: r)),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text('${formatDays(r.remaining)} gün kaldı',
+            style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 12, fontWeight: FontWeight.w600)),
       ),
     );
   }

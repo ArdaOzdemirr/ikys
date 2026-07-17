@@ -66,7 +66,7 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    return this.generateTokens(user.id, user.email, user.role);
+    return this.generateTokens(user.id, user.email, user.role, dto.rememberMe);
   }
 
   async refresh(refreshToken: string) {
@@ -78,10 +78,15 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token geçersiz veya süresi dolmuş');
     }
 
-    // Eskisini sil (rotation)
+    // Eskisini sil (rotation) - rememberMe durumu yeni token'a taşınır.
     await this.prisma.refreshToken.delete({ where: { id: stored.id } });
 
-    return this.generateTokens(stored.user.id, stored.user.email, stored.user.role);
+    return this.generateTokens(
+      stored.user.id,
+      stored.user.email,
+      stored.user.role,
+      stored.rememberMe,
+    );
   }
 
   async logout(userId: string) {
@@ -156,16 +161,24 @@ export class AuthService {
     return { success: true };
   }
 
-  private async generateTokens(userId: string, email: string, role: string) {
+  private async generateTokens(
+    userId: string,
+    email: string,
+    role: string,
+    rememberMe = false,
+  ) {
     const payload = { sub: userId, email, role };
     const accessToken = this.jwtService.sign(payload);
 
     const refreshToken = uuid();
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    // Beni Hatırla: oturum ~1 yıl açık kalır (fiilen çıkış yapmadan düşmez).
+    // Aksi halde 7 gün — ama her refresh'te tekrar 7 güne uzadığı için, en az
+    // haftada bir kullanan biri zaten hiç düşmez.
+    expiresAt.setDate(expiresAt.getDate() + (rememberMe ? 365 : 7));
 
     await this.prisma.refreshToken.create({
-      data: { token: refreshToken, userId, expiresAt },
+      data: { token: refreshToken, userId, expiresAt, rememberMe },
     });
 
     return {

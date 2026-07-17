@@ -48,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _email.text.trim(),
         _password.text,
         token2FA: _requires2FA ? _token.text.trim() : null,
+        rememberMe: _rememberMe,
       );
       if (res.requires2FA) {
         setState(() => _requires2FA = true);

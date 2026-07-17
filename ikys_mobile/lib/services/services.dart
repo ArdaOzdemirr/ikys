@@ -3,11 +3,13 @@ import '../models/models.dart';
 import 'api_client.dart';
 
 class AuthService {
-  static Future<AuthResult> login(String email, String password, {String? token2FA}) async {
+  static Future<AuthResult> login(String email, String password,
+      {String? token2FA, bool rememberMe = false}) async {
     final res = await ApiClient.instance.dio.post('/auth/login', data: {
       'email': email,
       'password': password,
       if (token2FA != null) 'token2FA': token2FA,
+      'rememberMe': rememberMe,
     });
     return AuthResult.fromJson(res.data);
   }

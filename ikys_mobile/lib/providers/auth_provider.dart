@@ -24,8 +24,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<AuthResult> login(String email, String password, {String? token2FA}) async {
-    final res = await AuthService.login(email, password, token2FA: token2FA);
+  Future<AuthResult> login(String email, String password,
+      {String? token2FA, bool rememberMe = false}) async {
+    final res = await AuthService.login(email, password,
+        token2FA: token2FA, rememberMe: rememberMe);
     if (!res.requires2FA) {
       await TokenStorage.instance.setTokens(res.accessToken!, res.refreshToken!);
       await TokenStorage.instance.setUser(res.user!);

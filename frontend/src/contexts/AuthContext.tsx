@@ -5,7 +5,7 @@ import type { User, AuthResponse } from '../types';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string, token2FA?: string) => Promise<AuthResponse>;
+  login: (email: string, password: string, token2FA?: string, rememberMe?: boolean) => Promise<AuthResponse>;
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (...roles: string[]) => boolean;
@@ -25,8 +25,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string, token2FA?: string) => {
-    const res = await api.post<AuthResponse>('/auth/login', { email, password, token2FA });
+  const login = async (email: string, password: string, token2FA?: string, rememberMe?: boolean) => {
+    const res = await api.post<AuthResponse>('/auth/login', { email, password, token2FA, rememberMe });
     if (!res.requires2FA) {
       localStorage.setItem('accessToken', res.accessToken);
       localStorage.setItem('refreshToken', res.refreshToken);

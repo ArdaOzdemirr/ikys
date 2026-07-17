@@ -14,13 +14,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [token2FA, setToken2FA] = useState('');
   const [requires2FA, setRequires2FA] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await login(email, password, requires2FA ? token2FA : undefined);
+      const res = await login(email, password, requires2FA ? token2FA : undefined, rememberMe);
       if (res.requires2FA) {
         setRequires2FA(true);
         toast('2FA kodu girin', { icon: '🔐' });
@@ -79,6 +80,16 @@ export default function LoginPage() {
                 />
               </div>
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="accent-brand-600"
+              />
+              Beni hatırla
+            </label>
 
             {requires2FA && (
               <div>

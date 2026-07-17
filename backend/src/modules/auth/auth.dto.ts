@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 
@@ -30,6 +30,11 @@ export class LoginDto {
   @IsOptional()
   @IsString()
   token2FA?: string;
+
+  @ApiProperty({ required: false, description: 'Beni Hatırla: oturum çok daha uzun süre açık kalır' })
+  @IsOptional()
+  @IsBoolean()
+  rememberMe?: boolean;
 }
 
 export class RefreshDto {

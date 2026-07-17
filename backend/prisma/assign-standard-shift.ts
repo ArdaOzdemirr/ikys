@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const EMAILS = ['savas@firma.com', 'abidin@firma.com', 'emir@firma.com'];
+const EMAILS = ['savas@firma.com', 'abidin@firma.com', 'emir@firma.com', 'ik@firma.com'];
 
 async function main() {
   const shift = await prisma.shift.findFirst({ where: { name: 'Standart' } });

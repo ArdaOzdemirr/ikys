@@ -5,8 +5,7 @@ import '../providers/auth_provider.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import 'leave_screen.dart';
-import 'notifications_screen.dart';
-import 'approvals_screen.dart';
+import 'notifications_screen.dart' show ComposeMessageScreen;
 import 'expenses_screen.dart';
 import 'payroll_screen.dart';
 
@@ -29,8 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
   MyProfile? _profile;
   Attendance? _today;
   LeaveBalance? _annual;
-  int _unread = 0;
-  int _pending = 0;
   bool _loading = true;
 
   @override
@@ -42,8 +39,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final isManager =
-        context.read<AuthProvider>().hasRole(['MANAGER', 'HR', 'ADMIN']);
 
     try {
       _profile = await ProfileService.me();
@@ -58,14 +53,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ? balances.firstWhere((b) => b.type == 'ANNUAL')
           : (balances.isNotEmpty ? balances.first : null);
     } catch (_) {}
-    try {
-      _unread = await NotificationService.unreadCount();
-    } catch (_) {}
-    if (isManager) {
-      try {
-        _pending = (await ApprovalService.pending()).length;
-      } catch (_) {}
-    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -83,8 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
-    final isManager =
-        context.read<AuthProvider>().hasRole(['MANAGER', 'HR', 'ADMIN']);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -141,22 +126,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 )),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _statCard(
-                  'Okunmamış Bildirim',
-                  '$_unread',
-                  Icons.notifications,
-                  const Color(0xFFD97706),
-                )),
-                const SizedBox(width: 12),
-                Expanded(child: isManager
-                    ? _statCard('Bekleyen Onay', '$_pending', Icons.checklist,
-                        const Color(0xFF7C3AED))
-                    : const SizedBox()),
-              ],
-            ),
           ],
 
           const SizedBox(height: 24),
@@ -171,11 +140,6 @@ class _HomeScreenState extends State<HomeScreen> {
               () => _go(const PayrollScreen())),
           _action(Icons.send, 'Mesaj Gönder',
               () => _go(const ComposeMessageScreen())),
-          _action(Icons.notifications_none, 'Bildirimler',
-              () => _go(const NotificationsScreen())),
-          if (isManager)
-            _action(Icons.checklist, 'İzin Onayları',
-                () => _openTab('İzin Onayları', const ApprovalsScreen())),
         ],
       ),
     );

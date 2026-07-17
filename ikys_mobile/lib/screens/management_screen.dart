@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'leave_list_screen.dart';
-import 'categories_admin_screen.dart';
 import 'attendance_overview_screen.dart';
 import 'leave_balances_screen.dart';
 
@@ -13,7 +12,6 @@ class ManagementScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final canCategories = auth.hasRole(['HR', 'ADMIN']);
     final canAttendanceOverview = auth.hasRole(['HR', 'ADMIN']);
     final canLeaveBalances = auth.hasRole(['HR', 'ADMIN']);
 
@@ -27,14 +25,6 @@ class ManagementScreen extends StatelessWidget {
           subtitle: 'Alınan/bekleyen izinler (yetkinize göre filtreli)',
           screen: const LeaveListScreen(),
         ),
-        if (canCategories)
-          _tile(
-            context,
-            icon: Icons.category_outlined,
-            title: 'İzin Kategorileri',
-            subtitle: 'Kategori aç/düzenle, kişiye özel gizle',
-            screen: const CategoriesAdminScreen(),
-          ),
         if (canAttendanceOverview)
           _tile(
             context,

@@ -118,12 +118,6 @@ export class LeaveService {
       approvers = fb ? [fb] : [];
     }
 
-    // Genel kural: yönetici zinciri onayladıktan sonra son adım olarak İK onaylar.
-    const hrId = await this.finalHrApprover(personnelId);
-    if (hrId && !approvers.includes(hrId)) {
-      approvers = [...approvers, hrId];
-    }
-
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.leaveRequest.create({
         data: {
@@ -373,6 +367,26 @@ export class LeaveService {
         },
         tx,
       );
+
+      // İK'ya bilgilendirme (onay gerekmez, sadece haberdar olsun).
+      const hrId = await this.finalHrApprover(req.personnelId);
+      if (hrId && hrId !== req.personnelId) {
+        await this.notifications.create(
+          {
+            recipientId: hrId,
+            senderId: approverPersonnelId,
+            type: NotificationType.LEAVE_APPROVED,
+            title: 'Onaylanan izin bilgilendirmesi',
+            body:
+              `${requesterName}, ` +
+              `${dayjs(req.startDate).format('DD.MM.YYYY')} - ${dayjs(req.endDate).format('DD.MM.YYYY')} ` +
+              `arası izinli (${req.totalDays} gün).`,
+            refType: 'LeaveRequest',
+            refId: requestId,
+          },
+          tx,
+        );
+      }
 
       return updated;
     });

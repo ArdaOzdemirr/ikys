@@ -14,6 +14,11 @@ dayjs.extend(timezone);
 // Türkiye saatine göre hesaplanmalı, yoksa geç kalma/gün sınırı yanlış çıkar.
 const TZ = 'Europe/Istanbul';
 
+// QR ile giriş/çıkışta, telefonun bildirdiği konumun şubeye en fazla bu kadar
+// (metre) uzakta olmasına izin verilir. Statik QR koduyla başka yerden (ör.
+// evden) sahte giriş yapılmasını engellemek için.
+const GEOFENCE_RADIUS_M = 300;
+
 @Injectable()
 export class AttendanceService {
   constructor(private prisma: PrismaService) {}
@@ -21,6 +26,48 @@ export class AttendanceService {
   private todayInTurkey(): Date {
     const d = dayjs().tz(TZ);
     return new Date(Date.UTC(d.year(), d.month(), d.date()));
+  }
+
+  /** İki koordinat arası kuş uçuşu mesafe (metre). */
+  private haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371000;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  /**
+   * QR ile giriş/çıkışta konum doğrulaması: telefon konumu gönderilmediyse
+   * veya personelin şubesine 300m'den uzaksa reddedilir. Şubenin konumu
+   * (latitude/longitude) hiç tanımlanmamışsa kontrol atlanır (geriye dönük
+   * uyumluluk — henüz konum girilmemiş şubeler için engellemez).
+   */
+  private async verifyGeofence(personnelId: string, latitude?: number, longitude?: number) {
+    if (latitude == null || longitude == null) {
+      throw new BadRequestException(
+        'Konum bilgisi alınamadı; QR ile giriş/çıkış için konum izni gerekli',
+      );
+    }
+    const personnel = await this.prisma.personnel.findUnique({
+      where: { id: personnelId },
+      select: {
+        department: { select: { branch: { select: { name: true, latitude: true, longitude: true } } } },
+      },
+    });
+    const branch = personnel?.department?.branch;
+    if (!branch || branch.latitude == null || branch.longitude == null) return;
+
+    const distance = this.haversineMeters(latitude, longitude, branch.latitude, branch.longitude);
+    if (distance > GEOFENCE_RADIUS_M) {
+      throw new BadRequestException(
+        `${branch.name} şubesinden çok uzaktasınız (${Math.round(distance)} m). ` +
+          'Mesai girişi/çıkışı için şubeye yakın olmalısınız.',
+      );
+    }
   }
 
   async generateQrCode(branchId?: string) {
@@ -54,6 +101,7 @@ export class AttendanceService {
       if (!qr || qr.validUntil < new Date()) {
         throw new BadRequestException('QR kodu geçersiz veya süresi dolmuş');
       }
+      await this.verifyGeofence(personnelId, dto.latitude, dto.longitude);
     }
 
     const today = this.todayInTurkey();
@@ -110,6 +158,7 @@ export class AttendanceService {
       if (!qr || qr.validUntil < new Date()) {
         throw new BadRequestException('QR kodu geçersiz veya süresi dolmuş');
       }
+      await this.verifyGeofence(personnelId, dto.latitude, dto.longitude);
     }
 
     const today = this.todayInTurkey();

@@ -52,7 +52,7 @@ function BranchesTab() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', city: '', address: '', phone: '' });
+  const [form, setForm] = useState({ name: '', city: '', address: '', phone: '', latitude: '', longitude: '' });
 
   const { data, isLoading } = useQuery({
     queryKey: ['branches'],
@@ -60,22 +60,35 @@ function BranchesTab() {
   });
 
   const reset = () => {
-    setForm({ name: '', city: '', address: '', phone: '' });
+    setForm({ name: '', city: '', address: '', phone: '', latitude: '', longitude: '' });
     setEditingId(null);
     setShowForm(false);
   };
 
   const startEdit = (b: any) => {
     setEditingId(b.id);
-    setForm({ name: b.name, city: b.city || '', address: b.address || '', phone: b.phone || '' });
+    setForm({
+      name: b.name,
+      city: b.city || '',
+      address: b.address || '',
+      phone: b.phone || '',
+      latitude: b.latitude != null ? String(b.latitude) : '',
+      longitude: b.longitude != null ? String(b.longitude) : '',
+    });
     setShowForm(true);
   };
 
   const save = useMutation({
-    mutationFn: (d: any) =>
-      editingId
-        ? api.patch(`/company/branches/${editingId}`, d)
-        : api.post('/company/branches', d),
+    mutationFn: (d: typeof form) => {
+      const payload = {
+        ...d,
+        latitude: d.latitude !== '' ? parseFloat(d.latitude) : null,
+        longitude: d.longitude !== '' ? parseFloat(d.longitude) : null,
+      };
+      return editingId
+        ? api.patch(`/company/branches/${editingId}`, payload)
+        : api.post('/company/branches', payload);
+    },
     onSuccess: () => {
       toast.success(editingId ? 'Şube güncellendi' : 'Şube eklendi');
       qc.invalidateQueries({ queryKey: ['branches'] });
@@ -138,7 +151,47 @@ function BranchesTab() {
               onChange={(e) => setForm({ ...form, address: e.target.value })}
               className="input"
             />
+            <input
+              placeholder="Enlem (latitude)"
+              type="number"
+              step="any"
+              value={form.latitude}
+              onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+              className="input"
+            />
+            <input
+              placeholder="Boylam (longitude)"
+              type="number"
+              step="any"
+              value={form.longitude}
+              onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+              className="input"
+            />
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (!navigator.geolocation) {
+                toast.error('Tarayıcın konum desteklemiyor');
+                return;
+              }
+              navigator.geolocation.getCurrentPosition(
+                (pos) =>
+                  setForm((f) => ({
+                    ...f,
+                    latitude: String(pos.coords.latitude),
+                    longitude: String(pos.coords.longitude),
+                  })),
+                () => toast.error('Konum alınamadı'),
+              );
+            }}
+            className="btn-secondary text-sm"
+          >
+            📍 Şu anki konumumu kullan
+          </button>
+          <p className="text-xs text-gray-500">
+            Konum girilirse, QR ile mesai girişi/çıkışı bu noktaya 300 metreden uzaktan yapılamaz.
+          </p>
           <div className="flex gap-2">
             <button type="submit" disabled={save.isPending} className="btn-primary">
               {save.isPending ? 'Kaydediliyor...' : editingId ? 'Güncelle' : 'Ekle'}
@@ -166,6 +219,11 @@ function BranchesTab() {
                 <p className="text-sm text-gray-600">{b.city || '-'}</p>
                 {b.address && <p className="text-xs text-gray-500 mt-1">{b.address}</p>}
                 {b.phone && <p className="text-xs text-gray-500">📞 {b.phone}</p>}
+                {b.latitude != null && b.longitude != null ? (
+                  <p className="text-xs text-green-600 mt-1">📍 Konum tanımlı (geofence aktif)</p>
+                ) : (
+                  <p className="text-xs text-amber-600 mt-1">⚠️ Konum tanımlı değil</p>
+                )}
                 <p className="text-xs text-brand-600 mt-2">
                   {b.departments?.length || 0} departman
                 </p>

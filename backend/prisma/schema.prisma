@@ -136,6 +136,8 @@ model Branch {
   address   String?
   city      String?
   phone     String?
+  latitude  Float? // QR ile mesai giriş/çıkışında konum doğrulaması (geofence) için
+  longitude Float?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -49,6 +49,17 @@ export class Verify2FADto {
   token!: string;
 }
 
+export class ForgotPasswordDto {
+  @ApiProperty()
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8, { message: 'Yeni şifre en az 8 karakter olmalı' })
+  newPassword!: string;
+}
+
 export class ChangePasswordDto {
   @ApiProperty()
   @IsString()

@@ -1,7 +1,7 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, RefreshDto, Verify2FADto, ChangePasswordDto } from './auth.dto';
+import { LoginDto, RegisterDto, RefreshDto, Verify2FADto, ChangePasswordDto, ForgotPasswordDto } from './auth.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -22,6 +22,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Giriş yap - e-posta + şifre + (opsiyonel) 2FA token' })
   login(@Body() dto: LoginDto, @Req() req) {
     return this.auth.login(dto, req.ip);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Şifremi unuttum: e-posta + yeni şifre (küçük ekip için doğrulamasız)' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.forgotPassword(dto.email, dto.newPassword);
   }
 
   @Public()

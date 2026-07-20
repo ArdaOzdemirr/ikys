@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_client.dart';
 import '../services/storage.dart';
 import 'server_settings_sheet.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -134,6 +135,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       value: _rememberMe,
                       onChanged: (v) => setState(() => _rememberMe = v ?? true),
                       title: const Text('Beni Hatırla', style: TextStyle(fontSize: 14)),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                        ),
+                        child: const Text('Şifremi unuttum'),
+                      ),
                     ),
                   ] else ...[
                     TextField(

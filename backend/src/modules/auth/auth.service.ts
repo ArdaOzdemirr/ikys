@@ -117,6 +117,26 @@ export class AuthService {
     return { success: true, message: 'Şifre değiştirildi. Tekrar giriş yapın.' };
   }
 
+  /**
+   * "Şifremi unuttum": küçük ekip için basitleştirilmiş akış — e-posta
+   * doğrulaması (mail/SMS) YOK, sadece kayıtlı e-postayı bilen kişi yeni
+   * şifre belirleyebilir. Mevcut oturumlar güvenlik için sonlandırılır.
+   */
+  async forgotPassword(email: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new BadRequestException('Bu e-posta ile kayıtlı kullanıcı yok');
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    await this.prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+
+    return { success: true, message: 'Şifre sıfırlandı. Yeni şifreyle giriş yapabilirsin.' };
+  }
+
   async disable2FA(userId: string) {
     await this.prisma.user.update({
       where: { id: userId },

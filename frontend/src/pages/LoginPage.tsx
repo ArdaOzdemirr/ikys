@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Building2, Lock, Mail, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -117,6 +117,10 @@ export default function LoginPage() {
               {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </button>
           </form>
+
+          <p className="text-center text-sm mt-4">
+            <Link to="/forgot-password" className="text-brand-600 hover:underline">Şifremi unuttum</Link>
+          </p>
         </div>
 
         <p className="text-center text-xs text-gray-500 mt-6">

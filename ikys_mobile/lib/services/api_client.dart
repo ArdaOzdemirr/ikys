@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:open_filex/open_filex.dart';
@@ -15,6 +16,14 @@ class ApiClient {
 
   late final Dio dio;
   void Function()? onForceLogout;
+
+  // Aynı anda birden fazla istek 401 alırsa hepsi TEK bir refresh çağrısını
+  // paylaşır. Backend'de refresh token'lar rotasyonlu (her kullanımda eskisi
+  // silinip yenisi oluşturuluyor) — her istek kendi başına ayrı refresh
+  // denerse, biri diğerinin az önce aldığı geçerli token'ı geçersiz kılıp
+  // kullanıcıyı yanlışlıkla çıkışa yollar.
+  bool _isRefreshing = false;
+  final List<Completer<String?>> _refreshWaiters = [];
 
   Future<void> init() async {
     final override = await TokenStorage.instance.getApiBaseUrlOverride();
@@ -37,34 +46,62 @@ class ApiClient {
         final alreadyRetried = e.requestOptions.extra['retried'] == true;
 
         if (isAuthError && !alreadyRetried) {
-          try {
-            final refresh = await TokenStorage.instance.getRefresh();
-            if (refresh == null) throw Exception('no refresh token');
-
-            // Ayrı bir Dio ile refresh (interceptor döngüsüne girmesin)
-            final res = await Dio(BaseOptions(baseUrl: apiBaseUrl))
-                .post('/auth/refresh', data: {'refreshToken': refresh});
-
-            await TokenStorage.instance.setTokens(
-              res.data['accessToken'],
-              res.data['refreshToken'],
-            );
-
-            // Orijinal isteği yeni token'la tekrarla
+          final newToken = await _refreshToken();
+          if (newToken != null) {
             final opts = e.requestOptions;
             opts.extra['retried'] = true;
-            opts.headers['Authorization'] = 'Bearer ${res.data['accessToken']}';
-            final clone = await dio.fetch(opts);
-            return handler.resolve(clone);
-          } catch (_) {
-            await TokenStorage.instance.clear();
-            onForceLogout?.call();
-            return handler.next(e);
+            opts.headers['Authorization'] = 'Bearer $newToken';
+            try {
+              final clone = await dio.fetch(opts);
+              return handler.resolve(clone);
+            } catch (_) {
+              return handler.next(e);
+            }
           }
+          return handler.next(e);
         }
         handler.next(e);
       },
     ));
+  }
+
+  /// Devam eden bir refresh varsa onun sonucunu bekler; yoksa yeni bir
+  /// refresh başlatır. Sonuç (yeni access token ya da null) tüm bekleyen
+  /// isteklerle paylaşılır.
+  Future<String?> _refreshToken() {
+    if (_isRefreshing) {
+      final completer = Completer<String?>();
+      _refreshWaiters.add(completer);
+      return completer.future;
+    }
+    _isRefreshing = true;
+    return _doRefresh().then((token) {
+      for (final w in _refreshWaiters) {
+        w.complete(token);
+      }
+      _refreshWaiters.clear();
+      _isRefreshing = false;
+      return token;
+    });
+  }
+
+  Future<String?> _doRefresh() async {
+    try {
+      final refresh = await TokenStorage.instance.getRefresh();
+      if (refresh == null) throw Exception('no refresh token');
+
+      // Ayrı bir Dio ile refresh (interceptor döngüsüne girmesin)
+      final res = await Dio(BaseOptions(baseUrl: apiBaseUrl))
+          .post('/auth/refresh', data: {'refreshToken': refresh});
+
+      final newAccess = res.data['accessToken'] as String;
+      await TokenStorage.instance.setTokens(newAccess, res.data['refreshToken']);
+      return newAccess;
+    } catch (_) {
+      await TokenStorage.instance.clear();
+      onForceLogout?.call();
+      return null;
+    }
   }
 
   /// Backend'in döndürdüğü göreli, JWT korumalı dosya url'ini (örn.

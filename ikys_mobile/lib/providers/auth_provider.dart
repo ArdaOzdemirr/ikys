@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../services/storage.dart';
+import '../services/push_service.dart';
 
 /// React'teki AuthContext'in karşılığı.
 class AuthProvider extends ChangeNotifier {
@@ -38,6 +39,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Token, erişim jetonu geçerliyken (silinmeden önce) sunucudan kaldırılmalı;
+    // aksi halde bu cihaz çıkış yaptıktan sonra da push bildirimi almaya devam eder.
+    await PushService.unregisterToken();
     try {
       await AuthService.logout();
     } catch (_) {

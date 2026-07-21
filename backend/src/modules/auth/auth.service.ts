@@ -91,6 +91,16 @@ export class AuthService {
 
   async logout(userId: string) {
     await this.prisma.refreshToken.deleteMany({ where: { userId } });
+    // İstemci (mobil) çıkışta push token'ını zaten ayrıca siliyor; burada da
+    // silinmesi, o çağrı ağ hatası/uygulama kapanması yüzünden yapılamazsa
+    // eski cihaza bildirim gitmeye devam etmesini önler.
+    const personnel = await this.prisma.personnel.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (personnel) {
+      await this.prisma.deviceToken.deleteMany({ where: { personnelId: personnel.id } });
+    }
     return { success: true };
   }
 

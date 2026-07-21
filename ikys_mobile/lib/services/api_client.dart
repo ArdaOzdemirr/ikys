@@ -108,7 +108,7 @@ class ApiClient {
   /// /api/v1/payroll/expenses/receipt/x) indirip cihazdaki varsayılan
   /// uygulamada açar. Doğrudan tarayıcıda açmak çalışmaz çünkü o istek
   /// Authorization header'ı taşımaz ve backend 401 döner.
-  Future<void> openFileUrl(String relativeUrl) async {
+  Future<void> openFileUrl(String relativeUrl, {String? fileName}) async {
     // dio.baseUrl zaten apiBaseUrl (örn. http://ip:3000/api/v1) olduğundan,
     // gelen url'in baştaki /api/v1 kısmını çıkarıp baseUrl'e göre relative isteriz.
     final path = relativeUrl.replaceFirst(RegExp(r'^/api/v1'), '');
@@ -116,7 +116,7 @@ class ApiClient {
       path,
       options: Options(responseType: ResponseType.bytes),
     );
-    final fileName = relativeUrl.split('/').last;
+    fileName ??= relativeUrl.split('/').last;
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(res.data!);

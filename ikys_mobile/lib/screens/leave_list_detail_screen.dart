@@ -32,6 +32,12 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
   String _status = 'ALL';
   int? _year;
   int? _month;
+  bool _showHourlyForm = false;
+  bool _grantingHourly = false;
+  DateTime? _hourlyDate;
+  TimeOfDay? _hourlyStart;
+  TimeOfDay? _hourlyEnd;
+  final _hourlyReason = TextEditingController();
 
   @override
   void initState() {
@@ -58,12 +64,153 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
       .toList()
     ..sort((a, b) => a.startDate.compareTo(b.startDate));
 
+  Future<void> _pickHourlyDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _hourlyDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      locale: const Locale('tr', 'TR'),
+    );
+    if (picked != null) setState(() => _hourlyDate = picked);
+  }
+
+  Future<void> _pickHourlyTime(bool isStart) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: (isStart ? _hourlyStart : _hourlyEnd) ?? TimeOfDay.now(),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        _hourlyStart = picked;
+      } else {
+        _hourlyEnd = picked;
+      }
+    });
+  }
+
+  String _fmtTime(TimeOfDay? t) => t == null
+      ? '--:--'
+      : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _submitHourly() async {
+    if (_hourlyDate == null || _hourlyStart == null || _hourlyEnd == null) return;
+    setState(() => _grantingHourly = true);
+    try {
+      await LeaveService.grantHourly(
+        personnelId: widget.personnel.id,
+        date: DateFormat('yyyy-MM-dd').format(_hourlyDate!),
+        startTime: _fmtTime(_hourlyStart),
+        endTime: _fmtTime(_hourlyEnd),
+        reason: _hourlyReason.text.trim(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Saatlik izin tanımlandı')));
+        setState(() {
+          _showHourlyForm = false;
+          _hourlyDate = null;
+          _hourlyStart = null;
+          _hourlyEnd = null;
+          _hourlyReason.clear();
+        });
+        _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(ApiClient.errorMessage(e, 'Tanımlanamadı'))));
+      }
+    } finally {
+      if (mounted) setState(() => _grantingHourly = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.personnel.fullName)),
+      appBar: AppBar(
+        title: Text(widget.personnel.fullName),
+        actions: [
+          IconButton(
+            icon: Icon(_showHourlyForm ? Icons.close : Icons.access_time),
+            tooltip: 'Saatlik İzin Ver',
+            onPressed: () => setState(() => _showHourlyForm = !_showHourlyForm),
+          ),
+        ],
+      ),
       body: Column(
         children: [
+          if (_showHourlyForm)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Saatlik İzin Ver', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2, bottom: 8),
+                    child: Text(
+                      'Bu izin doğrudan onaylı olarak kaydedilir ve yıllık izin bakiyesini etkilemez.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton(
+                        onPressed: _pickHourlyDate,
+                        child: Text(_hourlyDate == null
+                            ? 'Tarih Seç'
+                            : DateFormat('dd.MM.yyyy').format(_hourlyDate!)),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => _pickHourlyTime(true),
+                        child: Text('Başlangıç: ${_fmtTime(_hourlyStart)}'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => _pickHourlyTime(false),
+                        child: Text('Bitiş: ${_fmtTime(_hourlyEnd)}'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _hourlyReason,
+                    decoration: const InputDecoration(
+                      hintText: 'Açıklama (opsiyonel)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: (_grantingHourly ||
+                              _hourlyDate == null ||
+                              _hourlyStart == null ||
+                              _hourlyEnd == null)
+                          ? null
+                          : _submitHourly,
+                      child: _grantingHourly
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Kaydet'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Wrap(
@@ -184,6 +331,18 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
                       color: r.paymentType == 'UNPAID' ? const Color(0xFFDC2626) : const Color(0xFF166534),
                       fontSize: 12,
                       fontWeight: FontWeight.w600)),
+            ),
+          if (r.status == 'APPROVED')
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => ApiClient.instance.openFileUrl(
+                  '/leave/requests/${r.id}/document',
+                  fileName: 'izin-onay-belgesi-${r.id}.pdf',
+                ),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                child: const Text('Belge İndir', style: TextStyle(color: Color(0xFF2563EB))),
+              ),
             ),
         ],
       ),

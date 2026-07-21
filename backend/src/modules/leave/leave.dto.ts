@@ -32,6 +32,38 @@ export class CreateLeaveRequestDto {
   @IsOptional()
   @IsString()
   documentUrl?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: ['AM', 'PM'],
+    description: 'Yarım gün izin seansı: AM=09:00-13:30, PM=13:30-18:00 (type=HALF_DAY iken zorunlu)',
+  })
+  @IsOptional()
+  @IsEnum(['AM', 'PM'])
+  halfDayPeriod?: 'AM' | 'PM';
+}
+
+export class CreateHourlyLeaveDto {
+  @ApiProperty({ description: 'İzin verilecek personelin id\'si' })
+  @IsString()
+  personnelId!: string;
+
+  @ApiProperty()
+  @IsDateString()
+  date!: string;
+
+  @ApiProperty({ description: 'HH:mm formatında, örn. 14:00' })
+  @IsString()
+  startTime!: string;
+
+  @ApiProperty({ description: 'HH:mm formatında, örn. 16:00' })
+  @IsString()
+  endTime!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 export class ApproveLeaveDto {

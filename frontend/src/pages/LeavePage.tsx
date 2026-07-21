@@ -6,7 +6,8 @@ import { Calendar, Plus } from 'lucide-react';
 
 const LEAVE_TYPES = [
   { value: 'ANNUAL', label: 'Yıllık İzin' },
-  { value: 'HALF_DAY', label: 'Yarım Gün' },
+  { value: 'HALF_DAY_AM', label: 'Öğleden Önce İzni (09:00-13:30)' },
+  { value: 'HALF_DAY_PM', label: 'Öğleden Sonra İzni (13:30-18:00)' },
   { value: 'HOURLY', label: 'Saatlik' },
   { value: 'EXCUSE', label: 'Mazeret' },
   { value: 'SICK', label: 'Sağlık Raporu' },
@@ -26,6 +27,15 @@ function formatRange(startDate: string, endDate: string, totalDays: number) {
   const s = new Date(startDate).toLocaleDateString('tr-TR');
   const e = new Date(endDate).toLocaleDateString('tr-TR');
   return `${s} / ${e} arası izinli · ${totalDays} gün`;
+}
+
+// Backend'deki gerçek `type` + `halfDayPeriod` alanlarına göre görünen ad
+// (form'daki HALF_DAY_AM/HALF_DAY_PM sadece UI'da kullanılan sözde değerlerdir).
+function leaveTypeName(type: string, halfDayPeriod?: string | null) {
+  if (type === 'HALF_DAY') {
+    return halfDayPeriod === 'PM' ? 'Öğleden Sonra İzni' : 'Öğleden Önce İzni';
+  }
+  return LEAVE_TYPES.find((t) => t.value === type)?.label || type;
 }
 
 export default function LeavePage() {
@@ -48,7 +58,18 @@ export default function LeavePage() {
   });
 
   const create = useMutation({
-    mutationFn: (data: any) => api.post('/leave/requests', data),
+    mutationFn: (data: typeof form) => {
+      const isHalfDay = data.type === 'HALF_DAY_AM' || data.type === 'HALF_DAY_PM';
+      const payload: any = { ...data };
+      if (isHalfDay) {
+        payload.type = 'HALF_DAY';
+        payload.halfDayPeriod = data.type === 'HALF_DAY_AM' ? 'AM' : 'PM';
+        payload.endDate = data.startDate;
+      } else {
+        delete payload.halfDayPeriod;
+      }
+      return api.post('/leave/requests', payload);
+    },
     onSuccess: () => {
       toast.success('Talebiniz oluşturuldu, yönetici onayı bekleniyor');
       qc.invalidateQueries({ queryKey: ['leave-me'] });
@@ -57,6 +78,11 @@ export default function LeavePage() {
       setForm({ type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
+  });
+
+  const downloadDoc = useMutation({
+    mutationFn: (id: string) => api.download(`/leave/requests/${id}/document`, `izin-onay-belgesi-${id}.pdf`),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Belge indirilemedi'),
   });
 
   const cancel = useMutation({
@@ -105,7 +131,7 @@ export default function LeavePage() {
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="text-brand-600" size={18} />
               <p className="text-sm text-gray-600">
-                {LEAVE_TYPES.find((t) => t.value === b.type)?.label || b.type} ({b.year})
+                {leaveTypeName(b.type)} ({b.year})
               </p>
             </div>
             <p className="text-3xl font-bold text-gray-900">{b.remainingDays}</p>
@@ -117,7 +143,9 @@ export default function LeavePage() {
       </div>
 
       {/* Form */}
-      {showForm && (
+      {showForm && (() => {
+        const isHalfDay = form.type === 'HALF_DAY_AM' || form.type === 'HALF_DAY_PM';
+        return (
         <form
           onSubmit={(e) => { e.preventDefault(); create.mutate(form); }}
           className="card space-y-4"
@@ -126,14 +154,20 @@ export default function LeavePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">İzin Tipi</label>
-              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input">
+              <select
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
+                className="input"
+              >
                 {LEAVE_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Başlangıç</label>
+              <label className="block text-sm font-medium mb-1">
+                {isHalfDay ? 'Tarih' : 'Başlangıç'}
+              </label>
               <input
                 type="date"
                 required
@@ -143,17 +177,19 @@ export default function LeavePage() {
                 className="input"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Bitiş</label>
-              <input
-                type="date"
-                required
-                min={form.startDate || new Date().toISOString().split('T')[0]}
-                value={form.endDate}
-                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                className="input"
-              />
-            </div>
+            {!isHalfDay && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Bitiş</label>
+                <input
+                  type="date"
+                  required
+                  min={form.startDate || new Date().toISOString().split('T')[0]}
+                  value={form.endDate}
+                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                  className="input"
+                />
+              </div>
+            )}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-1">Açıklama</label>
               <textarea
@@ -165,7 +201,11 @@ export default function LeavePage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="submit" disabled={create.isPending} className="btn-primary">
+            <button
+              type="submit"
+              disabled={create.isPending}
+              className="btn-primary disabled:opacity-50"
+            >
               {create.isPending ? 'Gönderiliyor...' : 'Talep Gönder'}
             </button>
             <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">
@@ -173,7 +213,8 @@ export default function LeavePage() {
             </button>
           </div>
         </form>
-      )}
+        );
+      })()}
 
       {/* Geçmiş */}
       <div className="card overflow-x-auto p-0">
@@ -224,7 +265,7 @@ export default function LeavePage() {
               return filtered.map((r: any) => (
               <tr key={r.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm">
-                  {LEAVE_TYPES.find((t) => t.value === r.type)?.label || r.type}
+                  {leaveTypeName(r.type, r.halfDayPeriod)}
                 </td>
                 <td className="px-4 py-3 text-sm font-medium">
                   {formatRange(r.startDate, r.endDate, r.totalDays)}
@@ -261,6 +302,14 @@ export default function LeavePage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-3 items-center">
+                    {r.status === 'APPROVED' && (
+                      <button
+                        onClick={() => downloadDoc.mutate(r.id)}
+                        className="text-brand-600 hover:underline text-xs"
+                      >
+                        Belge İndir
+                      </button>
+                    )}
                     {r.status === 'PENDING' && (
                       <button
                         onClick={() => cancel.mutate(r.id)}

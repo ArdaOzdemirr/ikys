@@ -99,12 +99,31 @@ class LeaveService {
     required String startDate,
     required String endDate,
     String? reason,
+    String? halfDayPeriod, // 'AM' | 'PM' (type == 'HALF_DAY' iken zorunlu)
   }) async {
     await ApiClient.instance.dio.post('/leave/requests', data: {
       if (categoryId != null) 'categoryId': categoryId,
       if (categoryId == null && type != null) 'type': type,
       'startDate': startDate,
       'endDate': endDate,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+      if (halfDayPeriod != null) 'halfDayPeriod': halfDayPeriod,
+    });
+  }
+
+  /// İK: bir personele doğrudan saatlik izin tanımlar (bakiyeyi etkilemez).
+  static Future<void> grantHourly({
+    required String personnelId,
+    required String date,
+    required String startTime,
+    required String endTime,
+    String? reason,
+  }) async {
+    await ApiClient.instance.dio.post('/leave/requests/hourly', data: {
+      'personnelId': personnelId,
+      'date': date,
+      'startTime': startTime,
+      'endTime': endTime,
       if (reason != null && reason.isNotEmpty) 'reason': reason,
     });
   }

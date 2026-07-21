@@ -371,6 +371,12 @@ model LeaveRequest {
   reason      String?
   documentUrl String? // Sağlık raporu vb.
 
+  // Yarım gün izin: hangi seans (AM: 09:00-13:30, PM: 13:30-18:00)
+  halfDayPeriod String?
+  // Saatlik izin (İK tarafından doğrudan tanımlanır, bakiyeyi etkilemez)
+  startTime     String?
+  endTime       String?
+
   // İlk yıl izni: bakiye düşülmez, onaylayan ücretli/ücretsiz karar verir
   paymentType             PaymentType?
   requiresPaymentDecision Boolean      @default(false)

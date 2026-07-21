@@ -28,6 +28,9 @@ const _statusStyle = {
 
 String _leaveName(LeaveRequest r) {
   if (r.category?.name != null) return r.category!.name;
+  if (r.type == 'HALF_DAY') {
+    return r.halfDayPeriod == 'PM' ? 'Öğleden Sonra İzni' : 'Öğleden Önce İzni';
+  }
   if (r.type != null && _typeLabels[r.type] != null) return _typeLabels[r.type]!;
   return r.type ?? 'İzin';
 }
@@ -342,6 +345,18 @@ class _LeaveScreenState extends State<LeaveScreen> {
                 child: const Text('İptal Talebi Oluştur', style: TextStyle(color: Color(0xFFB45309))),
               ),
             ),
+          if (r.status == 'APPROVED')
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => ApiClient.instance.openFileUrl(
+                  '/leave/requests/${r.id}/document',
+                  fileName: 'izin-onay-belgesi-${r.id}.pdf',
+                ),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                child: const Text('Belge İndir', style: TextStyle(color: Color(0xFF2563EB))),
+              ),
+            ),
         ],
       ),
     );
@@ -367,9 +382,13 @@ class _NewLeaveSheetState extends State<_NewLeaveSheet> {
   final _reason = TextEditingController();
   bool _submitting = false;
 
-  // Sabit izin türleri (kategori tanımlı/görünür değilse devreye girer)
+  // Sabit izin türleri (kategori tanımlı/görünür değilse devreye girer).
+  // HALF_DAY_AM/HALF_DAY_PM sadece UI'da kullanılan sözde değerlerdir; backend'e
+  // gönderilirken type=HALF_DAY + halfDayPeriod=AM/PM olarak eşlenir.
   static const _fallbackTypes = <String, String>{
     'ANNUAL': 'Yıllık İzin',
+    'HALF_DAY_AM': 'Öğleden Önce İzni (09:00-13:30)',
+    'HALF_DAY_PM': 'Öğleden Sonra İzni (13:30-18:00)',
     'EXCUSE': 'Mazeret',
     'SICK': 'Sağlık Raporu',
     'UNPAID': 'Ücretsiz İzin',
@@ -418,16 +437,20 @@ class _NewLeaveSheetState extends State<_NewLeaveSheet> {
     });
   }
 
+  bool get _isHalfDay =>
+      _categoryId == null && (_fallbackType == 'HALF_DAY_AM' || _fallbackType == 'HALF_DAY_PM');
+
   Future<void> _submit() async {
     if (_categoryId == null && _fallbackType == null) return;
     setState(() => _submitting = true);
     try {
       await LeaveService.create(
         categoryId: _categoryId,
-        type: _categoryId == null ? _fallbackType : null,
+        type: _categoryId == null ? (_isHalfDay ? 'HALF_DAY' : _fallbackType) : null,
         startDate: DateFormat('yyyy-MM-dd').format(_start),
-        endDate: DateFormat('yyyy-MM-dd').format(_end),
+        endDate: DateFormat('yyyy-MM-dd').format(_isHalfDay ? _start : _end),
         reason: _reason.text.trim(),
+        halfDayPeriod: _isHalfDay ? (_fallbackType == 'HALF_DAY_AM' ? 'AM' : 'PM') : null,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -493,13 +516,15 @@ class _NewLeaveSheetState extends State<_NewLeaveSheet> {
                   }).toList(),
                 ),
               const SizedBox(height: 18),
-              const Text('Başlangıç', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(_isHalfDay ? 'Tarih' : 'Başlangıç', style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               _dateField(_start, () => _pickDate(true)),
-              const SizedBox(height: 18),
-              const Text('Bitiş', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _dateField(_end, () => _pickDate(false)),
+              if (!_isHalfDay) ...[
+                const SizedBox(height: 18),
+                const Text('Bitiş', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                _dateField(_end, () => _pickDate(false)),
+              ],
               const SizedBox(height: 18),
               const Text('Açıklama (opsiyonel)', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
@@ -515,7 +540,9 @@ class _NewLeaveSheetState extends State<_NewLeaveSheet> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: (_submitting || (_categoryId == null && _fallbackType == null)) ? null : _submit,
+                  onPressed: (_submitting || (_categoryId == null && _fallbackType == null))
+                      ? null
+                      : _submit,
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
                     padding: const EdgeInsets.symmetric(vertical: 15),

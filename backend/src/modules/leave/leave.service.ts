@@ -13,12 +13,21 @@ import {
   Role,
 } from '@prisma/client';
 import dayjs from 'dayjs';
-import { CreateLeaveRequestDto, ApproveLeaveDto } from './leave.dto';
+import PDFDocument from 'pdfkit';
+import * as path from 'path';
+import { CreateLeaveRequestDto, ApproveLeaveDto, CreateHourlyLeaveDto } from './leave.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { cumulativeAnnualLeaveEntitlement } from './leave-entitlement.util';
 
 @Injectable()
 export class LeaveService {
+  // require.resolve(paket adı) "main" alanı olmayan paketlerde başarısız olur;
+  // package.json'ı resolve ederek paketin kurulu olduğu dizini güvenilir buluyoruz.
+  private readonly fontsDir = path.join(
+    path.dirname(require.resolve('dejavu-fonts-ttf/package.json')),
+    'ttf',
+  );
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
@@ -52,11 +61,24 @@ export class LeaveService {
     });
     if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
 
-    // İş günü hesabı (resmi tatiller hariç)
-    const totalDays = await this.calculateBusinessDays(start, end);
-    if (totalDays <= 0) {
+    // Yarım gün: tek gün olmalı, seans (AM/PM) zorunlu, her zaman 0.5 gün sayılır.
+    const isHalfDay = dto.type === LeaveType.HALF_DAY;
+    if (isHalfDay) {
+      if (start.getTime() !== end.getTime()) {
+        throw new BadRequestException('Yarım gün izin sadece tek bir gün için alınabilir');
+      }
+      if (dto.halfDayPeriod !== 'AM' && dto.halfDayPeriod !== 'PM') {
+        throw new BadRequestException('Yarım gün için seans (öğleden önce/sonra) seçilmeli');
+      }
+    }
+
+    // İş günü hesabı (resmi tatiller hariç); yarım gün her zaman 0.5 sayılır
+    // ama seçilen günün gerçekten bir iş günü olduğu yine de doğrulanır.
+    const businessDays = await this.calculateBusinessDays(start, end);
+    if (businessDays <= 0) {
       throw new BadRequestException('Seçilen aralıkta iş günü yok');
     }
+    const totalDays = isHalfDay ? 0.5 : businessDays;
 
     // Belge: "Çakışma Kontrolü"
     const overlap = await this.prisma.leaveRequest.findFirst({
@@ -130,6 +152,7 @@ export class LeaveService {
           totalDays,
           reason: dto.reason,
           documentUrl: dto.documentUrl,
+          halfDayPeriod: isHalfDay ? dto.halfDayPeriod : null,
           requiresPaymentDecision,
           deductFromYear,
           currentStepOrder: 1,
@@ -161,6 +184,129 @@ export class LeaveService {
       }
 
       return request;
+    });
+  }
+
+  /**
+   * İK, bir çalışana doğrudan saatlik izin tanımlar: onay zinciri yok, talep
+   * zaten APPROVED olarak oluşur, yıllık izin bakiyesine hiç dokunulmaz.
+   */
+  async hrGrantHourlyLeave(hrPersonnelId: string, dto: CreateHourlyLeaveDto) {
+    const personnel = await this.prisma.personnel.findUnique({
+      where: { id: dto.personnelId },
+    });
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+
+    const date = new Date(dto.date);
+    const request = await this.prisma.leaveRequest.create({
+      data: {
+        personnelId: dto.personnelId,
+        type: LeaveType.HOURLY,
+        startDate: date,
+        endDate: date,
+        totalDays: 0,
+        reason: dto.reason,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        status: LeaveStatus.APPROVED,
+        approverId: hrPersonnelId,
+        approvedAt: new Date(),
+      },
+    });
+
+    await this.notifications.create({
+      recipientId: dto.personnelId,
+      senderId: hrPersonnelId,
+      type: NotificationType.LEAVE_APPROVED,
+      title: 'Saatlik izniniz tanımlandı',
+      body:
+        `${dayjs(date).format('DD.MM.YYYY')} tarihinde ${dto.startTime}-${dto.endTime} ` +
+        `arası saatlik izniniz İK tarafından tanımlandı.`,
+      refType: 'LeaveRequest',
+      refId: request.id,
+    });
+
+    return request;
+  }
+
+  /**
+   * Onaylanmış bir izin talebi için "İzin Onay Belgesi" PDF'i oluşturur.
+   * Sadece APPROVED durumundaki talepler için üretilebilir.
+   */
+  async generateApprovalPdf(requestId: string): Promise<Buffer> {
+    const req = await this.prisma.leaveRequest.findUnique({
+      where: { id: requestId },
+      include: { personnel: true, approver: true, category: true },
+    });
+    if (!req) throw new NotFoundException('İzin talebi bulunamadı');
+    if (req.status !== LeaveStatus.APPROVED) {
+      throw new BadRequestException('Sadece onaylanmış izinler için belge oluşturulabilir');
+    }
+
+    const typeLabels: Record<string, string> = {
+      ANNUAL: 'Yıllık İzin',
+      HALF_DAY: 'Yarım Gün İzin',
+      HOURLY: 'Saatlik İzin',
+      EXCUSE: 'Mazeret İzni',
+      SICK: 'Sağlık Raporu',
+      MATERNITY: 'Doğum İzni',
+      PATERNITY: 'Babalık İzni',
+      MARRIAGE: 'Evlilik İzni',
+      BEREAVEMENT: 'Vefat İzni',
+      UNPAID: 'Ücretsiz İzin',
+    };
+    const typeName = req.category?.name ?? (req.type ? typeLabels[req.type] ?? req.type : 'İzin');
+    const employeeName = `${req.personnel.firstName} ${req.personnel.lastName}`;
+    const approverName = req.approver
+      ? `${req.approver.firstName} ${req.approver.lastName}`
+      : '-';
+    const fmt = (d: Date) => dayjs(d).format('DD.MM.YYYY');
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (c) => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.registerFont('DejaVu', path.join(this.fontsDir, 'DejaVuSans.ttf'));
+      doc.registerFont('DejaVu-Bold', path.join(this.fontsDir, 'DejaVuSans-Bold.ttf'));
+      doc.font('DejaVu');
+
+      doc.font('DejaVu-Bold').fontSize(18).text('İZİN ONAY BELGESİ', { align: 'center' });
+      doc.moveDown(2);
+
+      const dayText =
+        req.totalDays === 1 ? '1 günlük' : `${req.totalDays.toString().replace('.', ',')} günlük`;
+      const periodText =
+        req.halfDayPeriod === 'AM'
+          ? ' (09:00-13:30 öğleden önce)'
+          : req.halfDayPeriod === 'PM'
+            ? ' (13:30-18:00 öğleden sonra)'
+            : req.startTime && req.endTime
+              ? ` (${req.startTime}-${req.endTime})`
+              : '';
+
+      doc.font('DejaVu').fontSize(12).text(
+        `${employeeName}, İKYS uygulaması üzerinden ${fmt(req.startDate)} - ${fmt(req.endDate)} ` +
+          `tarihleri arasında ${typeName} kapsamında ${dayText}${periodText} izin talebinde bulunmuştur. ` +
+          `${approverName} tarafından onaylanmıştır.`,
+        { align: 'left', lineGap: 4 },
+      );
+      doc.moveDown(2);
+
+      doc.text(`Tarih: ${fmt(req.approvedAt ?? req.updatedAt)}`);
+      doc.moveDown(3);
+
+      const colWidth = (doc.page.width - 100) / 2;
+      const y = doc.y;
+      doc.font('DejaVu-Bold').text('İşçi', 50, y);
+      doc.font('DejaVu').text(employeeName, 50, y + 18);
+
+      doc.font('DejaVu-Bold').text('Onaylayan', 50 + colWidth, y);
+      doc.font('DejaVu').text(approverName, 50 + colWidth, y + 18);
+
+      doc.end();
     });
   }
 
@@ -1054,7 +1200,10 @@ export class LeaveService {
       return {
         id: null,
         enumType: dto.type,
-        affectsAnnualBalance: dto.type === LeaveType.ANNUAL,
+        // Yarım gün de yıllık izin bakiyesinden düşer (0.5 gün); saatlik ise
+        // İK tarafından hrGrantHourlyLeave() ile ayrı bir yoldan, bakiyeye
+        // hiç dokunmadan tanımlanır (bkz. asağıda).
+        affectsAnnualBalance: dto.type === LeaveType.ANNUAL || dto.type === LeaveType.HALF_DAY,
         isPaid: true,
       };
     }

@@ -156,6 +156,7 @@ class LeaveRequest {
   final String? rejectionReason;
   final String? paymentType; // PAID | UNPAID
   final bool requiresPaymentDecision;
+  final String? halfDayPeriod; // AM | PM (type == HALF_DAY iken)
 
   LeaveRequest({
     required this.id,
@@ -169,6 +170,7 @@ class LeaveRequest {
     this.rejectionReason,
     this.paymentType,
     this.requiresPaymentDecision = false,
+    this.halfDayPeriod,
   });
 
   factory LeaveRequest.fromJson(Map<String, dynamic> j) => LeaveRequest(
@@ -183,6 +185,7 @@ class LeaveRequest {
         rejectionReason: j['rejectionReason'],
         paymentType: j['paymentType'],
         requiresPaymentDecision: j['requiresPaymentDecision'] ?? false,
+        halfDayPeriod: j['halfDayPeriod'],
       );
 }
 
@@ -460,7 +463,9 @@ class LeaveListItem {
       department: p['department']?['name'],
       leaveName: cat != null
           ? cat['name']
-          : (j['type'] != null ? (leaveTypeLabels[j['type']] ?? j['type']) : 'İzin'),
+          : (j['type'] == 'HALF_DAY'
+              ? (j['halfDayPeriod'] == 'PM' ? 'Öğleden Sonra İzni' : 'Öğleden Önce İzni')
+              : (j['type'] != null ? (leaveTypeLabels[j['type']] ?? j['type']) : 'İzin')),
       startDate: DateTime.parse(j['startDate']),
       endDate: DateTime.parse(j['endDate']),
       totalDays: (j['totalDays'] as num).toDouble(),

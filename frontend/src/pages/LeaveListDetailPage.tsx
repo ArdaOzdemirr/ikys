@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
-import { ArrowLeft, ListChecks } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { ArrowLeft, ListChecks, Clock } from 'lucide-react';
 
 const TYPE_LABELS: Record<string, string> = {
   ANNUAL: 'Yıllık İzin',
@@ -36,14 +37,33 @@ const fmt = (d: string) => new Date(d).toLocaleDateString('tr-TR');
 export default function LeaveListDetailPage() {
   const { personnelId } = useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const year = new Date().getFullYear();
   const [status, setStatus] = useState('ALL');
   const [yr, setYr] = useState('');
   const [month, setMonth] = useState('');
+  const [showHourly, setShowHourly] = useState(false);
+  const [hourlyForm, setHourlyForm] = useState({ date: '', startTime: '', endTime: '', reason: '' });
 
   const { data: rows } = useQuery<any[]>({
     queryKey: ['leave-list', status, yr],
     queryFn: () => api.get('/leave/list', { status, year: yr || undefined }),
+  });
+
+  const downloadDoc = useMutation({
+    mutationFn: (id: string) => api.download(`/leave/requests/${id}/document`, `izin-onay-belgesi-${id}.pdf`),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Belge indirilemedi'),
+  });
+
+  const grantHourly = useMutation({
+    mutationFn: () => api.post('/leave/requests/hourly', { personnelId, ...hourlyForm }),
+    onSuccess: () => {
+      toast.success('Saatlik izin tanımlandı');
+      qc.invalidateQueries({ queryKey: ['leave-list'] });
+      setShowHourly(false);
+      setHourlyForm({ date: '', startTime: '', endTime: '', reason: '' });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Tanımlanamadı'),
   });
 
   const mine = (rows ?? [])
@@ -60,13 +80,63 @@ export default function LeaveListDetailPage() {
         <ArrowLeft size={16} /> Personel listesine dön
       </button>
 
-      <div className="flex items-center gap-2">
-        <ListChecks className="text-brand-600" />
-        <h1 className="text-2xl font-bold text-gray-900">
-          {person ? `${person.firstName} ${person.lastName}` : 'İzin Geçmişi'}
-        </h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ListChecks className="text-brand-600" />
+          <h1 className="text-2xl font-bold text-gray-900">
+            {person ? `${person.firstName} ${person.lastName}` : 'İzin Geçmişi'}
+          </h1>
+        </div>
+        <button onClick={() => setShowHourly(!showHourly)} className="btn-secondary flex items-center gap-2 text-sm">
+          <Clock size={16} /> Saatlik İzin Ver
+        </button>
       </div>
       {person && <p className="text-sm text-gray-500">{person.department?.name ?? '-'}</p>}
+
+      {showHourly && (
+        <form
+          onSubmit={(e) => { e.preventDefault(); grantHourly.mutate(); }}
+          className="card space-y-3"
+        >
+          <h3 className="font-semibold">Saatlik İzin Ver</h3>
+          <p className="text-xs text-gray-500">Bu izin doğrudan onaylı olarak kaydedilir ve yıllık izin bakiyesini etkilemez.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input
+              type="date"
+              required
+              value={hourlyForm.date}
+              onChange={(e) => setHourlyForm({ ...hourlyForm, date: e.target.value })}
+              className="input"
+            />
+            <input
+              type="time"
+              required
+              value={hourlyForm.startTime}
+              onChange={(e) => setHourlyForm({ ...hourlyForm, startTime: e.target.value })}
+              className="input"
+            />
+            <input
+              type="time"
+              required
+              value={hourlyForm.endTime}
+              onChange={(e) => setHourlyForm({ ...hourlyForm, endTime: e.target.value })}
+              className="input"
+            />
+            <input
+              placeholder="Açıklama (opsiyonel)"
+              value={hourlyForm.reason}
+              onChange={(e) => setHourlyForm({ ...hourlyForm, reason: e.target.value })}
+              className="input md:col-span-3"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" disabled={grantHourly.isPending} className="btn-primary disabled:opacity-50">
+              {grantHourly.isPending ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+            <button type="button" onClick={() => setShowHourly(false)} className="btn-secondary">İptal</button>
+          </div>
+        </form>
+      )}
 
       <div className="flex gap-3 flex-wrap">
         <select className="input max-w-[180px]" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -101,19 +171,23 @@ export default function LeaveListDetailPage() {
               <th className="px-4 py-3">Gün</th>
               <th className="px-4 py-3">Ücret</th>
               <th className="px-4 py-3">Durum</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {!rows ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Yükleniyor...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Yükleniyor...</td></tr>
             ) : mine.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Kayıt yok</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">Kayıt yok</td></tr>
             ) : mine.map((r: any) => {
               const s = statusLabel[r.status] || statusLabel.PENDING;
               return (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm">
-                    {r.category?.name || (r.type ? TYPE_LABELS[r.type] ?? r.type : '-')}
+                    {r.category?.name ||
+                      (r.type === 'HALF_DAY'
+                        ? r.halfDayPeriod === 'PM' ? 'Öğleden Sonra İzni' : 'Öğleden Önce İzni'
+                        : r.type ? TYPE_LABELS[r.type] ?? r.type : '-')}
                   </td>
                   <td className="px-4 py-3 text-sm">{fmt(r.startDate)}</td>
                   <td className="px-4 py-3 text-sm">{fmt(r.endDate)}</td>
@@ -123,6 +197,16 @@ export default function LeaveListDetailPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`badge ${s.cls}`}>{s.label}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.status === 'APPROVED' && (
+                      <button
+                        onClick={() => downloadDoc.mutate(r.id)}
+                        className="text-brand-600 hover:underline text-xs"
+                      >
+                        Belge İndir
+                      </button>
+                    )}
                   </td>
                 </tr>
               );

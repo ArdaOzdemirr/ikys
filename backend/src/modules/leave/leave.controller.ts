@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { LeaveService } from './leave.service';
-import { ApproveLeaveDto, CreateLeaveRequestDto } from './leave.dto';
+import { ApproveLeaveDto, CreateLeaveRequestDto, CreateHourlyLeaveDto } from './leave.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
@@ -51,6 +52,43 @@ export class LeaveController {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
     if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.approve(id, personnel.id, dto, role);
+  }
+
+  @Post('requests/hourly')
+  @Roles(Role.HR, Role.ADMIN)
+  @ApiOperation({ summary: 'İK: bir personele doğrudan saatlik izin tanımla (bakiyeyi etkilemez)' })
+  async grantHourly(@CurrentUser('userId') userId: string, @Body() dto: CreateHourlyLeaveDto) {
+    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+    return this.service.hrGrantHourlyLeave(personnel.id, dto);
+  }
+
+  @Get('requests/:id/document')
+  @ApiOperation({ summary: 'Onaylanmış izin için "İzin Onay Belgesi" PDF indir' })
+  async downloadDocument(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+
+    const req = await this.prisma.leaveRequest.findUnique({ where: { id } });
+    if (!req) throw new NotFoundException('İzin talebi bulunamadı');
+
+    const isOwner = req.personnelId === personnel.id;
+    const isHrAdmin = role === Role.HR || role === Role.ADMIN;
+    if (!isOwner && !isHrAdmin) {
+      throw new ForbiddenException('Bu belgeyi görüntüleme yetkiniz yok');
+    }
+
+    const buffer = await this.service.generateApprovalPdf(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="izin-onay-belgesi-${id}.pdf"`,
+    });
+    res.send(buffer);
   }
 
   @Delete('requests/:id')

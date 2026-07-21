@@ -257,9 +257,17 @@ export class LeaveService {
     };
     const typeName = req.category?.name ?? (req.type ? typeLabels[req.type] ?? req.type : 'İzin');
     const employeeName = `${req.personnel.firstName} ${req.personnel.lastName}`;
-    const approverName = req.approver
-      ? `${req.approver.firstName} ${req.approver.lastName}`
-      : '-';
+
+    // Belgede kim onaylarsa onaylasın "Onaylayan" olarak her zaman İK gösterilir.
+    const hr = await this.prisma.personnel.findFirst({
+      where: { status: 'ACTIVE', user: { role: Role.HR } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const approverName = hr
+      ? `${hr.firstName} ${hr.lastName}`
+      : req.approver
+        ? `${req.approver.firstName} ${req.approver.lastName}`
+        : '-';
     const fmt = (d: Date) => dayjs(d).format('DD.MM.YYYY');
 
     return new Promise((resolve, reject) => {

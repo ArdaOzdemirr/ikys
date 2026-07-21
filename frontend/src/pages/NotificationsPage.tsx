@@ -225,10 +225,6 @@ interface ThreadMessage {
   createdAt: string;
 }
 
-// Sohbet modunda (tek kişiyle mesajlaşırken) her mesaj bu jenerik başlıkla
-// gönderilir; balonda ayrıca gösterilmez, sadece içerik (body) görünür.
-const CHAT_TITLE = 'Mesaj';
-
 /** Seçili kişiyle aramızdaki eski mesajlar — normal bir sohbet alanı gibi. */
 function MessageThread({ otherId }: { otherId: string }) {
   const { data: messages } = useQuery<ThreadMessage[]>({
@@ -246,7 +242,6 @@ function MessageThread({ otherId }: { otherId: string }) {
       ) : (
         messages.map((m) => {
           const fromMe = m.senderId !== otherId;
-          const showTitle = m.title !== CHAT_TITLE;
           return (
             <div
               key={m.id}
@@ -254,8 +249,8 @@ function MessageThread({ otherId }: { otherId: string }) {
                 fromMe ? 'ml-auto bg-brand-100 text-brand-900' : 'bg-white border border-gray-200 text-gray-800'
               }`}
             >
-              {showTitle && <p className="font-medium">{m.title}</p>}
-              {m.body && <p className={showTitle ? 'text-gray-600 mt-0.5' : ''}>{m.body}</p>}
+              <p className="font-medium">{m.title}</p>
+              {m.body && <p className="text-gray-600 mt-0.5">{m.body}</p>}
               <p className="text-[11px] text-gray-400 mt-1">{timeAgo(m.createdAt)}</p>
             </div>
           );
@@ -313,6 +308,7 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
   );
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [chatTitle, setChatTitle] = useState('');
   const [chatText, setChatText] = useState('');
 
   const { data: recipients } = useQuery<Recipient[]>({
@@ -330,7 +326,7 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
     mutationFn: () => {
       if (replyTo && !broadcast) {
         return api.post(`/notifications/${replyTo.notificationId}/reply`, {
-          title: chatMode ? CHAT_TITLE : title,
+          title: chatMode ? chatTitle : title,
           body: (chatMode ? chatText : body) || undefined,
           priority,
         });
@@ -340,7 +336,7 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
       }
       return api.post('/notifications/message', {
         recipientIds: [...selected],
-        title: chatMode ? CHAT_TITLE : title,
+        title: chatMode ? chatTitle : title,
         body: (chatMode ? chatText : body) || undefined,
         priority,
       });
@@ -349,6 +345,7 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
       if (!chatMode) toast.success(`${res.sent} kişiye gönderildi`);
       setTitle('');
       setBody('');
+      setChatTitle('');
       setChatText('');
       qc.invalidateQueries({ queryKey: ['notifications'] });
       if (chatOtherId) qc.invalidateQueries({ queryKey: ['notif-thread', chatOtherId] });
@@ -379,7 +376,7 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
   });
   const selectedPerson = recipients?.find((r) => r.id === chatOtherId);
   const canSend = chatMode
-    ? chatText.trim().length > 0
+    ? chatTitle.trim().length > 0 && chatText.trim().length > 0
     : title.trim().length > 0 && (broadcast || selected.size > 0);
 
   return (
@@ -450,6 +447,13 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
             </div>
             <MessageThread otherId={chatOtherId!} />
             <div className="border-t border-gray-200 p-3 space-y-2">
+              <input
+                className="input"
+                value={chatTitle}
+                onChange={(e) => setChatTitle(e.target.value)}
+                placeholder="Başlık"
+                maxLength={150}
+              />
               <PriorityPicker value={priority} onChange={setPriority} compact />
               <div className="flex gap-2 items-end">
                 <textarea

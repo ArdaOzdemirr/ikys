@@ -292,10 +292,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 }
 
-// Sohbet modunda (tek kişiyle mesajlaşırken) her mesaj bu jenerik başlıkla
-// gönderilir; balonda ayrıca gösterilmez, sadece içerik (body) görünür.
-const _chatTitle = 'Mesaj';
-
 /// Seçili kişiyle aramızdaki eski mesajlar — normal bir sohbet alanı gibi.
 class _MessageThread extends StatefulWidget {
   final String otherId;
@@ -341,7 +337,6 @@ class _MessageThreadState extends State<_MessageThread> {
       itemBuilder: (_, i) {
         final m = messages[i];
         final fromMe = m.senderId != widget.otherId;
-        final showTitle = m.title != _chatTitle;
         return Align(
           alignment: fromMe ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
@@ -357,11 +352,10 @@ class _MessageThreadState extends State<_MessageThread> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (showTitle)
-                  Text(m.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(m.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 if (m.body != null && m.body!.isNotEmpty)
                   Padding(
-                    padding: EdgeInsets.only(top: showTitle ? 2 : 0),
+                    padding: const EdgeInsets.only(top: 2),
                     child: Text(m.body!, style: const TextStyle(fontSize: 13)),
                   ),
                 Padding(
@@ -434,6 +428,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
   final Set<String> _selected = {};
   final _title = TextEditingController();
   final _body = TextEditingController();
+  final _chatTitle = TextEditingController();
   final _chatText = TextEditingController();
   final _search = TextEditingController();
   bool _loading = true;
@@ -473,7 +468,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
   bool get _chatMode => _threadOtherId != null;
 
   Future<void> _send() async {
-    final title = _chatMode ? _chatTitle : _title.text.trim();
+    final title = _chatMode ? _chatTitle.text.trim() : _title.text.trim();
     final body = _chatMode ? _chatText.text.trim() : _body.text.trim();
     if (title.isEmpty) return;
     if (!_broadcast && widget.replyToNotificationId == null && _selected.isEmpty) return;
@@ -500,6 +495,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
       if (_chatMode) {
         // Sohbet modunda ekrandan çıkmadan devam edilebilsin.
         _chatText.clear();
+        _chatTitle.clear();
         setState(() {
           _sending = false;
           _threadRefreshKey++;
@@ -535,7 +531,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
   Widget _chatBody() {
     final other = _recipients.where((r) => r.id == _threadOtherId).toList();
     final headerName = widget.replyToName ?? (other.isNotEmpty ? other.first.fullName : '...');
-    final canSend = _chatText.text.trim().isNotEmpty;
+    final canSend = _chatTitle.text.trim().isNotEmpty && _chatText.text.trim().isNotEmpty;
     return Column(
       children: [
         Container(
@@ -579,6 +575,18 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                TextField(
+                  controller: _chatTitle,
+                  maxLength: 150,
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                  decoration: const InputDecoration(
+                    hintText: 'Başlık',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 8),
                 _priorityRow(compact: true),
                 const SizedBox(height: 8),
                 Row(

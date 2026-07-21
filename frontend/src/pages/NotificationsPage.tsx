@@ -216,6 +216,91 @@ function InboxList({
   );
 }
 
+interface ThreadMessage {
+  id: string;
+  senderId: string | null;
+  title: string;
+  body?: string | null;
+  priority: 'NORMAL' | 'IMPORTANT' | 'URGENT';
+  createdAt: string;
+}
+
+// Sohbet modunda (tek kişiyle mesajlaşırken) her mesaj bu jenerik başlıkla
+// gönderilir; balonda ayrıca gösterilmez, sadece içerik (body) görünür.
+const CHAT_TITLE = 'Mesaj';
+
+/** Seçili kişiyle aramızdaki eski mesajlar — normal bir sohbet alanı gibi. */
+function MessageThread({ otherId }: { otherId: string }) {
+  const { data: messages } = useQuery<ThreadMessage[]>({
+    queryKey: ['notif-thread', otherId],
+    queryFn: () => api.get(`/notifications/thread/${otherId}`),
+    refetchInterval: 15000,
+  });
+
+  return (
+    <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50 flex flex-col">
+      {!messages ? (
+        <p className="text-sm text-gray-400">Yükleniyor...</p>
+      ) : messages.length === 0 ? (
+        <p className="text-sm text-gray-400 m-auto">Bu kişiyle henüz mesajlaşma yok.</p>
+      ) : (
+        messages.map((m) => {
+          const fromMe = m.senderId !== otherId;
+          const showTitle = m.title !== CHAT_TITLE;
+          return (
+            <div
+              key={m.id}
+              className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+                fromMe ? 'ml-auto bg-brand-100 text-brand-900' : 'bg-white border border-gray-200 text-gray-800'
+              }`}
+            >
+              {showTitle && <p className="font-medium">{m.title}</p>}
+              {m.body && <p className={showTitle ? 'text-gray-600 mt-0.5' : ''}>{m.body}</p>}
+              <p className="text-[11px] text-gray-400 mt-1">{timeAgo(m.createdAt)}</p>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function PriorityPicker({
+  value, onChange, compact,
+}: {
+  value: 'NORMAL' | 'IMPORTANT' | 'URGENT';
+  onChange: (v: 'NORMAL' | 'IMPORTANT' | 'URGENT') => void;
+  compact?: boolean;
+}) {
+  return (
+    <div>
+      <div className="flex gap-2">
+        {([
+          ['NORMAL', 'Normal', 'bg-gray-100 text-gray-700'],
+          ['IMPORTANT', 'Önemli', 'bg-amber-100 text-amber-800'],
+          ['URGENT', 'Çok Önemli', 'bg-red-100 text-red-700'],
+        ] as const).map(([val, label, cls]) => (
+          <button
+            key={val}
+            type="button"
+            onClick={() => onChange(val)}
+            className={`${compact ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-lg font-medium border ${
+              value === val ? `${cls} border-transparent ring-2 ring-offset-1 ring-current` : 'bg-white text-gray-500 border-gray-200'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {value === 'URGENT' && !compact && (
+        <p className="text-xs text-red-500 mt-1">
+          Alıcının telefonunda farklı sesle, kırmızı heads-up bildirim olarak düşer.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => void }) {
   const qc = useQueryClient();
   const { hasRole } = useAuth();
@@ -228,38 +313,52 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
   );
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [chatText, setChatText] = useState('');
 
   const { data: recipients } = useQuery<Recipient[]>({
     queryKey: ['notif-recipients'],
     queryFn: () => api.get('/notifications/recipients'),
   });
 
+  // Gönderim seçenekleri (alıcı/duyuru/önem) aynı kalıyor; tek bir alıcıyla
+  // (ya da yanıt modunda) normal bir sohbet alanı gibi eski mesajlar + mesaj
+  // kutusu gösteriliyor. Birden fazla alıcı / toplu duyuruda eski form kalıyor.
+  const chatOtherId = !broadcast ? (replyTo?.id ?? (selected.size === 1 ? [...selected][0] : null)) : null;
+  const chatMode = chatOtherId != null;
+
   const send = useMutation({
     mutationFn: () => {
       if (replyTo && !broadcast) {
         return api.post(`/notifications/${replyTo.notificationId}/reply`, {
-          title,
-          body: body || undefined,
+          title: chatMode ? CHAT_TITLE : title,
+          body: (chatMode ? chatText : body) || undefined,
           priority,
         });
       }
-      return broadcast
-        ? api.post('/notifications/broadcast', { title, body: body || undefined, priority })
-        : api.post('/notifications/message', {
-            recipientIds: [...selected],
-            title,
-            body: body || undefined,
-            priority,
-          });
+      if (broadcast) {
+        return api.post('/notifications/broadcast', { title, body: body || undefined, priority });
+      }
+      return api.post('/notifications/message', {
+        recipientIds: [...selected],
+        title: chatMode ? CHAT_TITLE : title,
+        body: (chatMode ? chatText : body) || undefined,
+        priority,
+      });
     },
     onSuccess: (res: any) => {
-      toast.success(`${res.sent} kişiye gönderildi`);
-      setSelected(new Set());
+      if (!chatMode) toast.success(`${res.sent} kişiye gönderildi`);
       setTitle('');
       setBody('');
+      setChatText('');
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      if (chatOtherId) qc.invalidateQueries({ queryKey: ['notif-thread', chatOtherId] });
+      if (chatMode) {
+        // Sohbet modunda ekrandan çıkmadan devam edilebilsin.
+        return;
+      }
+      setSelected(new Set());
       setBroadcast(false);
       setPriority('NORMAL');
-      qc.invalidateQueries({ queryKey: ['notifications'] });
       onSent();
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Gönderilemedi'),
@@ -278,8 +377,10 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
       .toLowerCase()
       .includes(q);
   });
-  const canSend =
-    title.trim().length > 0 && (broadcast || (replyTo ? true : selected.size > 0));
+  const selectedPerson = recipients?.find((r) => r.id === chatOtherId);
+  const canSend = chatMode
+    ? chatText.trim().length > 0
+    : title.trim().length > 0 && (broadcast || selected.size > 0);
 
   return (
     <div className="space-y-4">
@@ -292,18 +393,12 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
         {canBroadcast && (
         <label className="flex items-center gap-2 text-sm bg-brand-50 text-brand-800 rounded-lg px-3 py-2">
           <input type="checkbox" className="accent-brand-600" checked={broadcast}
-            onChange={(e) => setBroadcast(e.target.checked)} />
+            onChange={(e) => { setBroadcast(e.target.checked); setSelected(new Set()); }} />
           Herkese gönder (toplu duyuru)
         </label>
         )}
 
-        {replyTo && !broadcast && (
-          <div className="flex items-center gap-2 text-sm bg-brand-50 text-brand-700 rounded-lg px-3 py-2">
-            <Reply size={15} /> Yanıt: <strong>{replyTo.name}</strong>
-          </div>
-        )}
-
-        {!broadcast && !replyTo && (
+        {!broadcast && !replyTo && !chatMode && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Alıcılar ({selected.size} seçili)
@@ -337,49 +432,72 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
           </div>
         )}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Başlık</label>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)}
-            placeholder="Mesaj başlığı" maxLength={150} />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Mesaj</label>
-          <textarea className="input" rows={4} value={body} onChange={(e) => setBody(e.target.value)}
-            placeholder="Mesajınızı yazın..." maxLength={2000} />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Önem</label>
-          <div className="flex gap-2">
-            {([
-              ['NORMAL', 'Normal', 'bg-gray-100 text-gray-700'],
-              ['IMPORTANT', 'Önemli', 'bg-amber-100 text-amber-800'],
-              ['URGENT', 'Çok Önemli', 'bg-red-100 text-red-700'],
-            ] as const).map(([val, label, cls]) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setPriority(val)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
-                  priority === val ? `${cls} border-transparent ring-2 ring-offset-1 ring-current` : 'bg-white text-gray-500 border-gray-200'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        {chatMode ? (
+          <div className="-m-4 sm:-m-6 flex flex-col" style={{ height: 480 }}>
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                {replyTo ? <><Reply size={15} className="text-brand-600" /> {replyTo.name}</>
+                  : selectedPerson ? `${selectedPerson.firstName} ${selectedPerson.lastName}` : '...'}
+              </div>
+              {!replyTo && (
+                <button
+                  onClick={() => setSelected(new Set())}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Değiştir
+                </button>
+              )}
+            </div>
+            <MessageThread otherId={chatOtherId!} />
+            <div className="border-t border-gray-200 p-3 space-y-2">
+              <PriorityPicker value={priority} onChange={setPriority} compact />
+              <div className="flex gap-2 items-end">
+                <textarea
+                  className="input flex-1"
+                  rows={2}
+                  value={chatText}
+                  onChange={(e) => setChatText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (canSend && !send.isPending) send.mutate();
+                    }
+                  }}
+                  placeholder="Mesajınızı yazın..."
+                  maxLength={2000}
+                />
+                <button onClick={() => send.mutate()} disabled={!canSend || send.isPending}
+                  className="btn-primary flex items-center gap-2 disabled:opacity-50 h-fit">
+                  <Send size={16} />
+                </button>
+              </div>
+            </div>
           </div>
-          {priority === 'URGENT' && (
-            <p className="text-xs text-red-500 mt-1">
-              Alıcının telefonunda farklı sesle, kırmızı heads-up bildirim olarak düşer.
-            </p>
-          )}
-        </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Başlık</label>
+              <input className="input" value={title} onChange={(e) => setTitle(e.target.value)}
+                placeholder="Mesaj başlığı" maxLength={150} />
+            </div>
 
-        <button onClick={() => send.mutate()} disabled={!canSend || send.isPending}
-          className="btn-primary flex items-center gap-2 disabled:opacity-50">
-          <Send size={16} /> Gönder
-        </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mesaj</label>
+              <textarea className="input" rows={4} value={body} onChange={(e) => setBody(e.target.value)}
+                placeholder="Mesajınızı yazın..." maxLength={2000} />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Önem</label>
+              <PriorityPicker value={priority} onChange={setPriority} />
+            </div>
+
+            <button onClick={() => send.mutate()} disabled={!canSend || send.isPending}
+              className="btn-primary flex items-center gap-2 disabled:opacity-50">
+              <Send size={16} /> Gönder
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

@@ -292,6 +292,126 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 }
 
+// Sohbet modunda (tek kişiyle mesajlaşırken) her mesaj bu jenerik başlıkla
+// gönderilir; balonda ayrıca gösterilmez, sadece içerik (body) görünür.
+const _chatTitle = 'Mesaj';
+
+/// Seçili kişiyle aramızdaki eski mesajlar — normal bir sohbet alanı gibi.
+class _MessageThread extends StatefulWidget {
+  final String otherId;
+  final bool expand;
+  const _MessageThread({super.key, required this.otherId, this.expand = false});
+
+  @override
+  State<_MessageThread> createState() => _MessageThreadState();
+}
+
+class _MessageThreadState extends State<_MessageThread> {
+  List<ThreadMessage>? _messages;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MessageThread old) {
+    super.didUpdateWidget(old);
+    if (old.otherId != widget.otherId) {
+      _messages = null;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final msgs = await NotificationService.thread(widget.otherId);
+      if (mounted) setState(() => _messages = msgs);
+    } catch (_) {
+      if (mounted) setState(() => _messages = []);
+    }
+  }
+
+  Widget _list(BuildContext context, List<ThreadMessage> messages) {
+    return ListView.builder(
+      shrinkWrap: !widget.expand,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      itemCount: messages.length,
+      itemBuilder: (_, i) {
+        final m = messages[i];
+        final fromMe = m.senderId != widget.otherId;
+        final showTitle = m.title != _chatTitle;
+        return Align(
+          alignment: fromMe ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+            decoration: BoxDecoration(
+              color: fromMe ? const Color(0xFFDBEAFE) : Colors.white,
+              border: fromMe ? null : Border.all(color: const Color(0xFFE5E7EB)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showTitle)
+                  Text(m.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                if (m.body != null && m.body!.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.only(top: showTitle ? 2 : 0),
+                    child: Text(m.body!, style: const TextStyle(fontSize: 13)),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(_timeAgo(m.createdAt),
+                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messages = _messages;
+    final body = messages == null
+        ? const Center(child: Text('Yükleniyor...', style: TextStyle(color: Colors.grey)))
+        : messages.isEmpty
+            ? const Center(child: Text('Bu kişiyle henüz mesajlaşma yok.', style: TextStyle(color: Colors.grey)))
+            : _list(context, messages);
+
+    if (widget.expand) {
+      return Container(color: const Color(0xFFF9FAFB), child: body);
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      constraints: const BoxConstraints(maxHeight: 260),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(10, 8, 10, 4),
+            child: Text('Önceki Mesajlar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          Flexible(child: body),
+        ],
+      ),
+    );
+  }
+}
+
 /// Kendi seviyesi / bir alt seviyesindeki kişilere serbest mesaj.
 /// replyTo verilirse (size mesaj atan bir üst amire yanıt), o kişi zorunlu alıcı olur.
 class ComposeMessageScreen extends StatefulWidget {
@@ -314,11 +434,13 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
   final Set<String> _selected = {};
   final _title = TextEditingController();
   final _body = TextEditingController();
+  final _chatText = TextEditingController();
   final _search = TextEditingController();
   bool _loading = true;
   bool _sending = false;
   bool _broadcast = false;
   String _priority = 'NORMAL';
+  int _threadRefreshKey = 0;
 
   @override
   void initState() {
@@ -339,32 +461,53 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
   void _snack(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
+  // Gönderim seçenekleri (alıcı/duyuru/önem) aynı kalıyor; tek bir alıcıyla
+  // (ya da yanıt modunda) normal bir sohbet alanı gibi eski mesajlar + mesaj
+  // kutusu gösteriliyor. Birden fazla alıcı / toplu duyuruda eski form kalıyor.
+  String? get _threadOtherId {
+    if (_broadcast) return null;
+    if (widget.replyToId != null) return widget.replyToId;
+    return _selected.length == 1 ? _selected.first : null;
+  }
+
+  bool get _chatMode => _threadOtherId != null;
+
   Future<void> _send() async {
-    if (_title.text.trim().isEmpty) return;
+    final title = _chatMode ? _chatTitle : _title.text.trim();
+    final body = _chatMode ? _chatText.text.trim() : _body.text.trim();
+    if (title.isEmpty) return;
     if (!_broadcast && widget.replyToNotificationId == null && _selected.isEmpty) return;
     setState(() => _sending = true);
     try {
       final int n;
       if (_broadcast) {
-        n = await NotificationService.broadcast(
-            _title.text.trim(), _body.text.trim(), priority: _priority);
+        n = await NotificationService.broadcast(title, body, priority: _priority);
       } else if (widget.replyToNotificationId != null) {
         n = await NotificationService.reply(
           notificationId: widget.replyToNotificationId!,
-          title: _title.text.trim(),
-          body: _body.text.trim(),
+          title: title,
+          body: body,
           priority: _priority,
         );
       } else {
         n = await NotificationService.sendMessage(
           recipientIds: _selected.toList(),
-          title: _title.text.trim(),
-          body: _body.text.trim(),
+          title: title,
+          body: body,
           priority: _priority,
         );
       }
-      _snack('$n kişiye gönderildi');
-      if (mounted) Navigator.pop(context, true);
+      if (_chatMode) {
+        // Sohbet modunda ekrandan çıkmadan devam edilebilsin.
+        _chatText.clear();
+        setState(() {
+          _sending = false;
+          _threadRefreshKey++;
+        });
+      } else {
+        _snack('$n kişiye gönderildi');
+        if (mounted) Navigator.pop(context, true);
+      }
     } catch (e) {
       _snack(ApiClient.errorMessage(e, 'Gönderilemedi'));
       setState(() => _sending = false);
@@ -378,8 +521,104 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
     return s.isEmpty ? '-' : s;
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _priorityRow({bool compact = false}) {
+    return Wrap(
+      spacing: 8,
+      children: [
+        _priorityChip('NORMAL', 'Normal', Colors.grey),
+        _priorityChip('IMPORTANT', 'Önemli', const Color(0xFFD97706)),
+        _priorityChip('URGENT', 'Çok Önemli', const Color(0xFFDC2626)),
+      ],
+    );
+  }
+
+  Widget _chatBody() {
+    final other = _recipients.where((r) => r.id == _threadOtherId).toList();
+    final headerName = widget.replyToName ?? (other.isNotEmpty ? other.first.fullName : '...');
+    final canSend = _chatText.text.trim().isNotEmpty;
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+          ),
+          child: Row(
+            children: [
+              if (widget.replyToId != null) ...[
+                const Icon(Icons.reply, size: 16, color: Color(0xFF1D4ED8)),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
+                child: Text(headerName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+              if (widget.replyToId == null)
+                TextButton(
+                  onPressed: () => setState(() => _selected.clear()),
+                  child: const Text('Değiştir'),
+                ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _MessageThread(
+            key: ValueKey('${_threadOtherId!}-$_threadRefreshKey'),
+            otherId: _threadOtherId!,
+            expand: true,
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _priorityRow(compact: true),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _chatText,
+                        maxLength: 2000,
+                        maxLines: 4,
+                        minLines: 1,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                        decoration: const InputDecoration(
+                          hintText: 'Mesajınızı yazın...',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      onPressed: (!canSend || _sending) ? null : _send,
+                      icon: _sending
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.send),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _formBody(bool canBroadcast) {
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? _recipients
@@ -389,7 +628,112 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
                 .contains(q))
             .toList();
     final canSend = _title.text.trim().isNotEmpty &&
-        (_broadcast || widget.replyToNotificationId != null || _selected.isNotEmpty);
+        (_broadcast || _selected.isNotEmpty);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (canBroadcast)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: SwitchListTile(
+              value: _broadcast,
+              onChanged: (v) => setState(() {
+                _broadcast = v;
+                _selected.clear();
+              }),
+              title: const Text('Herkese gönder (toplu duyuru)',
+                  style: TextStyle(color: Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
+              subtitle: const Text('Tüm personele bildirim'),
+            ),
+          ),
+        if (!_broadcast) ...[
+          const Text(
+            'İstediğiniz herhangi bir çalışana mesaj gönderebilirsiniz.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          Text('Alıcılar (${_selected.length} seçili)',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _search,
+            decoration: const InputDecoration(
+              hintText: 'Ad, departman veya pozisyona göre ara...',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 8),
+          if (_recipients.isEmpty)
+            const Text('Kişi bulunamadı.', style: TextStyle(color: Colors.grey))
+          else
+            ...filtered.map((p) => CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: _selected.contains(p.id),
+                  onChanged: (v) => setState(() {
+                    v == true ? _selected.add(p.id) : _selected.remove(p.id);
+                  }),
+                  title: Text(p.fullName),
+                  subtitle: Text(_sub(p)),
+                )),
+        ],
+        const SizedBox(height: 16),
+        TextField(
+          controller: _title,
+          maxLength: 150,
+          decoration: const InputDecoration(
+            labelText: 'Başlık',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _body,
+          maxLength: 2000,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            labelText: 'Mesaj',
+            alignLabelWithHint: true,
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text('Önem', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        _priorityRow(),
+        if (_priority == 'URGENT')
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'Alıcının telefonunda farklı sesle, kırmızı heads-up bildirim olarak düşer.',
+              style: TextStyle(color: Color(0xFFDC2626), fontSize: 12),
+            ),
+          ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: (!canSend || _sending) ? null : _send,
+            icon: const Icon(Icons.send),
+            label: Text(_sending ? 'Gönderiliyor...' : 'Gönder'),
+            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final canBroadcast = context
         .watch<AuthProvider>()
         .hasRole(['HR', 'ADMIN', 'ACCOUNTING']);
@@ -398,133 +742,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
       appBar: AppBar(title: const Text('Mesaj Gönder')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (canBroadcast)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SwitchListTile(
-                    value: _broadcast,
-                    onChanged: (v) => setState(() => _broadcast = v),
-                    title: const Text('Herkese gönder (toplu duyuru)',
-                        style: TextStyle(
-                            color: Color(0xFF1D4ED8),
-                            fontWeight: FontWeight.w600)),
-                    subtitle: const Text('Tüm personele bildirim'),
-                  ),
-                ),
-                if (widget.replyToName != null && !_broadcast)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.reply, size: 16, color: Color(0xFF1D4ED8)),
-                        const SizedBox(width: 8),
-                        Text('Yanıt: ${widget.replyToName}',
-                            style: const TextStyle(
-                                color: Color(0xFF1D4ED8),
-                                fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                if (!_broadcast && widget.replyToNotificationId == null) ...[
-                  const Text(
-                    'İstediğiniz herhangi bir çalışana mesaj gönderebilirsiniz.',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Alıcılar (${_selected.length} seçili)',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _search,
-                    decoration: const InputDecoration(
-                      hintText: 'Ad, departman veya pozisyona göre ara...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 8),
-                  if (_recipients.isEmpty && widget.replyToId == null)
-                    const Text('Kişi bulunamadı.',
-                        style: TextStyle(color: Colors.grey))
-                  else
-                    ...filtered.map((p) => CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          value: _selected.contains(p.id),
-                          onChanged: (v) => setState(() {
-                            v == true ? _selected.add(p.id) : _selected.remove(p.id);
-                          }),
-                          title: Text(p.fullName),
-                          subtitle: Text(_sub(p)),
-                        )),
-                ],
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _title,
-                  maxLength: 150,
-                  decoration: const InputDecoration(
-                    labelText: 'Başlık',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _body,
-                  maxLength: 2000,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'Mesaj',
-                    alignLabelWithHint: true,
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text('Önem', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _priorityChip('NORMAL', 'Normal', Colors.grey),
-                    _priorityChip('IMPORTANT', 'Önemli', const Color(0xFFD97706)),
-                    _priorityChip('URGENT', 'Çok Önemli', const Color(0xFFDC2626)),
-                  ],
-                ),
-                if (_priority == 'URGENT')
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6),
-                    child: Text(
-                      'Alıcının telefonunda farklı sesle, kırmızı heads-up bildirim olarak düşer.',
-                      style: TextStyle(color: Color(0xFFDC2626), fontSize: 12),
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: (!canSend || _sending) ? null : _send,
-                    icon: const Icon(Icons.send),
-                    label: Text(_sending ? 'Gönderiliyor...' : 'Gönder'),
-                    style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14)),
-                  ),
-                ),
-              ],
-            ),
+          : (_chatMode ? _chatBody() : _formBody(canBroadcast)),
     );
   }
 

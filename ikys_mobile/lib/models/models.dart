@@ -230,6 +230,34 @@ class NotificationItem {
   }
 }
 
+/// İki kişi arasındaki mesaj geçmişindeki tek bir mesaj (bkz. NotificationService.thread).
+class ThreadMessage {
+  final String id;
+  final String? senderId;
+  final String title;
+  final String? body;
+  final String priority;
+  final DateTime createdAt;
+
+  ThreadMessage({
+    required this.id,
+    this.senderId,
+    required this.title,
+    this.body,
+    this.priority = 'NORMAL',
+    required this.createdAt,
+  });
+
+  factory ThreadMessage.fromJson(Map<String, dynamic> j) => ThreadMessage(
+        id: j['id'],
+        senderId: j['senderId'],
+        title: j['title'],
+        body: j['body'],
+        priority: j['priority'] ?? 'NORMAL',
+        createdAt: DateTime.parse(j['createdAt']).toLocal(),
+      );
+}
+
 class AttendanceOverviewRow {
   final String personnelId;
   final String firstName;

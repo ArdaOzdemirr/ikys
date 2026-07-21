@@ -57,6 +57,16 @@ export class NotificationsController {
     return this.service.messageableRecipients(p.id);
   }
 
+  @Get('thread/:personnelId')
+  @ApiOperation({ summary: 'Belirli bir kişiyle aramızdaki mesaj geçmişi (eski -> yeni)' })
+  async thread(
+    @CurrentUser('userId') userId: string,
+    @Param('personnelId') personnelId: string,
+  ) {
+    const p = await this.me(userId);
+    return this.service.thread(p.id, personnelId);
+  }
+
   @Post('message')
   @ApiOperation({ summary: 'Aynı seviyedeki veya alt kademedeki personele mesaj gönder' })
   async send(

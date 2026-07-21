@@ -73,6 +73,31 @@ export class NotificationsService {
     return created;
   }
 
+  /**
+   * İki kişi arasındaki mesaj geçmişi (eski -> yeni), gönderim ekranında
+   * "eski mesajları görmek" için. Sadece type=MESSAGE, her iki yön de dahil.
+   */
+  async thread(meId: string, otherId: string) {
+    return this.prisma.notification.findMany({
+      where: {
+        type: NotificationType.MESSAGE,
+        OR: [
+          { senderId: meId, recipientId: otherId },
+          { senderId: otherId, recipientId: meId },
+        ],
+      },
+      select: {
+        id: true,
+        senderId: true,
+        title: true,
+        body: true,
+        priority: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   /** Çalışanın gelen kutusu (en yeni önce). */
   list(personnelId: string, onlyUnread = false, limit = 50) {
     return this.prisma.notification.findMany({

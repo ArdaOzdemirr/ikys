@@ -202,6 +202,11 @@ class NotificationService {
     return (res.data['sent'] as num).toInt();
   }
 
+  static Future<List<ThreadMessage>> thread(String otherId) async {
+    final res = await ApiClient.instance.dio.get('/notifications/thread/$otherId');
+    return (res.data as List).map((e) => ThreadMessage.fromJson(e)).toList();
+  }
+
   static Future<int> reply({
     required String notificationId,
     required String title,

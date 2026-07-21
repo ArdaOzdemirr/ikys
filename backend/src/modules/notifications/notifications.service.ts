@@ -103,6 +103,7 @@ export class NotificationsService {
     return this.prisma.notification.findMany({
       where: {
         recipientId: personnelId,
+        deletedAt: null,
         ...(onlyUnread ? { isRead: false } : {}),
       },
       include: {
@@ -115,7 +116,7 @@ export class NotificationsService {
 
   async unreadCount(personnelId: string) {
     const count = await this.prisma.notification.count({
-      where: { recipientId: personnelId, isRead: false },
+      where: { recipientId: personnelId, isRead: false, deletedAt: null },
     });
     return { count };
   }
@@ -135,20 +136,27 @@ export class NotificationsService {
 
   async markAllRead(personnelId: string) {
     const res = await this.prisma.notification.updateMany({
-      where: { recipientId: personnelId, isRead: false },
+      where: { recipientId: personnelId, isRead: false, deletedAt: null },
       data: { isRead: true, readAt: new Date() },
     });
     return { updated: res.count };
   }
 
-  /** Bildirimi siler (yalnızca sahibi silebilir). */
+  /**
+   * Bildirimi "siler" (yalnızca sahibi silebilir). Satır fiilen silinmez:
+   * type=MESSAGE olanlarda karşı taraf mesajı hâlâ kendi sohbet geçmişinde
+   * (bkz. thread()) görebilsin diye sadece kendi gelen kutusundan gizlenir.
+   */
   async remove(id: string, personnelId: string) {
     const notif = await this.prisma.notification.findUnique({ where: { id } });
     if (!notif) throw new NotFoundException('Bildirim bulunamadı');
     if (notif.recipientId !== personnelId) {
       throw new ForbiddenException('Bu bildirim size ait değil');
     }
-    await this.prisma.notification.delete({ where: { id } });
+    await this.prisma.notification.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { success: true };
   }
 

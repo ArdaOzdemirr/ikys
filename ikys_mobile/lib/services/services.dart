@@ -53,8 +53,14 @@ class AttendanceService {
 }
 
 class HolidayService {
-  static Future<List<Holiday>> list() async {
-    final res = await ApiClient.instance.dio.get('/leave/holidays');
+  static Future<List<Holiday>> list({int? year}) async {
+    final res = await ApiClient.instance.dio.get('/leave/holidays',
+        queryParameters: year != null ? {'year': year} : null);
+    return (res.data as List).map((e) => Holiday.fromJson(e)).toList();
+  }
+
+  static Future<List<Holiday>> upcoming() async {
+    final res = await ApiClient.instance.dio.get('/leave/holidays/upcoming');
     return (res.data as List).map((e) => Holiday.fromJson(e)).toList();
   }
 
@@ -353,6 +359,15 @@ class ProfileService {
       'oldPassword': oldPassword,
       'newPassword': newPassword,
     });
+  }
+}
+
+/// Personel belgeleri (kimlik, diploma, sözleşme vb.) — görüntüleme.
+/// Yükleme/silme yalnızca web'de HR/Admin tarafından yapılır.
+class DocumentService {
+  static Future<List<PersonnelDocument>> list(String personnelId) async {
+    final res = await ApiClient.instance.dio.get('/documents/personnel/$personnelId');
+    return (res.data as List).map((e) => PersonnelDocument.fromJson(e)).toList();
   }
 }
 

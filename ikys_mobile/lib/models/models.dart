@@ -606,6 +606,7 @@ class CategoryVisibility {
 
 // ============ Profil (kendi kaydım) ============
 class MyProfile {
+  final String id;
   final String firstName;
   final String lastName;
   final String email;
@@ -620,6 +621,7 @@ class MyProfile {
   final DateTime? hireDate;
 
   MyProfile({
+    required this.id,
     required this.firstName,
     required this.lastName,
     required this.email,
@@ -640,6 +642,7 @@ class MyProfile {
     final u = j['user'] ?? {};
     final mgr = j['manager'];
     return MyProfile(
+      id: j['id'] ?? '',
       firstName: j['firstName'] ?? '',
       lastName: j['lastName'] ?? '',
       email: u['email'] ?? '',
@@ -654,6 +657,31 @@ class MyProfile {
       hireDate: j['hireDate'] != null ? DateTime.tryParse(j['hireDate']) : null,
     );
   }
+}
+
+/// Personel belgesi (kimlik, diploma, sözleşme vb.) — bkz. DocumentService.
+class PersonnelDocument {
+  final String id;
+  final String fileName;
+  final String type;
+  final String fileUrl;
+  final DateTime uploadedAt;
+
+  PersonnelDocument({
+    required this.id,
+    required this.fileName,
+    required this.type,
+    required this.fileUrl,
+    required this.uploadedAt,
+  });
+
+  factory PersonnelDocument.fromJson(Map<String, dynamic> j) => PersonnelDocument(
+        id: j['id'],
+        fileName: j['fileName'] ?? '',
+        type: j['type'] ?? 'diger',
+        fileUrl: j['fileUrl'] ?? '',
+        uploadedAt: DateTime.tryParse(j['uploadedAt'] ?? '') ?? DateTime.now(),
+      );
 }
 
 // ============ Masraf ============

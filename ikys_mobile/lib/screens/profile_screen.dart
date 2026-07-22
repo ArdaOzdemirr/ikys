@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../services/push_service.dart';
 import '../services/api_client.dart';
+import 'payroll_screen.dart';
 
 const _roleLabel = {
   'EMPLOYEE': 'Çalışan',
@@ -25,6 +26,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   MyProfile? _profile;
   List<LeaveBalance> _balances = [];
+  List<PersonnelDocument> _documents = [];
   bool _loading = true;
 
   @override
@@ -41,6 +43,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       _balances = await LeaveService.myBalance();
     } catch (_) {}
+    if (_profile != null) {
+      try {
+        _documents = await DocumentService.list(_profile!.id);
+      } catch (_) {}
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -161,6 +168,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
               )
             else
               ..._balances.map(_balanceCard),
+
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _section('Belgelerim'),
+                TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PayrollScreen()),
+                  ),
+                  icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                  label: const Text('Bordrolarım'),
+                ),
+              ],
+            ),
+            if (_documents.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text('Henüz belge yüklenmemiş.', style: TextStyle(color: Colors.grey)),
+              )
+            else
+              ..._documents.map(_documentRow),
           ],
 
           const SizedBox(height: 24),
@@ -196,6 +225,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Text(t,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
       );
+
+  Widget _documentRow(PersonnelDocument d) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6))),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.description_outlined, size: 18, color: Color(0xFF2563EB)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(d.fileName, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w500)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.open_in_new, size: 18),
+            tooltip: 'Görüntüle',
+            onPressed: () => ApiClient.instance.openFileUrl(d.fileUrl, fileName: d.fileName),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _balanceCard(LeaveBalance b) {
     return Container(

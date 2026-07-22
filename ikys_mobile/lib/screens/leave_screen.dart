@@ -354,7 +354,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
                   fileName: 'izin-onay-belgesi-${r.id}.pdf',
                 ),
                 style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                child: const Text('Belge İndir', style: TextStyle(color: Color(0xFF2563EB))),
+                child: const Text('Belge Görüntüle', style: TextStyle(color: Color(0xFF2563EB))),
               ),
             ),
         ],

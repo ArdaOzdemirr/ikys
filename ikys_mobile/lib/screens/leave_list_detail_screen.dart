@@ -28,12 +28,14 @@ class LeaveListDetailScreen extends StatefulWidget {
 
 class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
   List<LeaveListItem> _items = [];
+  List<LeaveBalanceRow> _balances = [];
   bool _loading = true;
   String _status = 'ALL';
-  int? _year;
+  int? _year = DateTime.now().year;
   int? _month;
   bool _showHourlyForm = false;
   bool _grantingHourly = false;
+  bool _openingReport = false;
   DateTime? _hourlyDate;
   TimeOfDay? _hourlyStart;
   TimeOfDay? _hourlyEnd;
@@ -49,6 +51,7 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
     setState(() => _loading = true);
     try {
       _items = await LeaveListService.list(status: _status, year: _year);
+      _balances = await LeaveService.allBalances();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -56,6 +59,28 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
       }
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  LeaveBalanceRow? get _myBalance {
+    final matches = _balances.where((b) => b.personnelId == widget.personnel.id);
+    return matches.isEmpty ? null : matches.first;
+  }
+
+  Future<void> _viewYearlyReport() async {
+    setState(() => _openingReport = true);
+    try {
+      final yearParam = _year?.toString() ?? 'all';
+      await ApiClient.instance.openFileUrl(
+        '/leave/balance/${widget.personnel.id}/pdf?year=$yearParam',
+        fileName: 'izin-dokumu-${widget.personnel.id}-$yearParam.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(ApiClient.errorMessage(e, 'Açılamadı'))));
+      }
+    }
+    if (mounted) setState(() => _openingReport = false);
   }
 
   List<LeaveListItem> get _filtered => _items
@@ -134,6 +159,15 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
         title: Text(widget.personnel.fullName),
         actions: [
           IconButton(
+            icon: _openingReport
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: 'Yıllık Rapor Görüntüle',
+            onPressed: _openingReport ? null : _viewYearlyReport,
+          ),
+          IconButton(
             icon: Icon(_showHourlyForm ? Icons.close : Icons.access_time),
             tooltip: 'Saatlik İzin Ver',
             onPressed: () => setState(() => _showHourlyForm = !_showHourlyForm),
@@ -142,6 +176,19 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
       ),
       body: Column(
         children: [
+          if (_myBalance != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Row(
+                children: [
+                  Expanded(child: _balanceCard('Toplam Hak', _myBalance!.totalEntitled)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _balanceCard('Kullanılan', _myBalance!.used)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _balanceCard('Kalan', _myBalance!.remaining, highlight: true)),
+                ],
+              ),
+            ),
           if (_showHourlyForm)
             Container(
               margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -288,6 +335,28 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
     );
   }
 
+  Widget _balanceCard(String label, double value, {bool highlight = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: highlight ? const Color(0xFFEFF6FF) : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          Text('${formatDays(value)} gün',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: highlight ? const Color(0xFF1D4ED8) : Colors.black87,
+              )),
+          const SizedBox(height: 2),
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
   Widget _card(LeaveListItem r) {
     final s = _statusStyle[r.status] ?? _statusStyle['PENDING']!;
     return Container(
@@ -341,7 +410,7 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
                   fileName: 'izin-onay-belgesi-${r.id}.pdf',
                 ),
                 style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                child: const Text('Belge İndir', style: TextStyle(color: Color(0xFF2563EB))),
+                child: const Text('Belge Görüntüle', style: TextStyle(color: Color(0xFF2563EB))),
               ),
             ),
         ],

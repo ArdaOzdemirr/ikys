@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/models.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_client.dart';
 import '../services/services.dart';
 import 'leave_list_detail_screen.dart';
 
 /// İK/Muhasebe/Admin/Yönetici: personel seç, sonra o kişinin izin geçmişine gir.
+/// Ayrı bir "Personel İzin Bakiyeleri" ekranına gerek kalmasın diye bakiyeler
+/// de (yalnızca HR/Admin için) burada gösteriliyor.
 class LeaveListScreen extends StatefulWidget {
   const LeaveListScreen({super.key});
 
@@ -14,7 +18,9 @@ class LeaveListScreen extends StatefulWidget {
 
 class _LeaveListScreenState extends State<LeaveListScreen> {
   List<LeavePersonnelRow> _rows = [];
+  List<LeaveBalanceRow> _balances = [];
   bool _loading = true;
+  bool _downloadingPdf = false;
 
   @override
   void initState() {
@@ -22,10 +28,14 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
     _load();
   }
 
+  bool get _canSeeBalances =>
+      context.read<AuthProvider>().hasRole(['HR', 'ADMIN']);
+
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
       _rows = await LeaveListService.personnel();
+      if (_canSeeBalances) _balances = await LeaveService.allBalances();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -35,10 +45,41 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
+  Future<void> _viewPdf() async {
+    setState(() => _downloadingPdf = true);
+    try {
+      final year = DateTime.now().year;
+      await ApiClient.instance.openFileUrl(
+        '/leave/balance/all/pdf?year=$year',
+        fileName: 'izin-tablosu-$year.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(ApiClient.errorMessage(e, 'Açılamadı'))));
+      }
+    }
+    if (mounted) setState(() => _downloadingPdf = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('İzin Listesi')),
+      appBar: AppBar(
+        title: const Text('İzin Listesi'),
+        actions: [
+          if (_canSeeBalances)
+            IconButton(
+              icon: _downloadingPdf
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'PDF Görüntüle',
+              onPressed: _downloadingPdf ? null : _viewPdf,
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -62,12 +103,29 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
   }
 
   Widget _row(LeavePersonnelRow r) {
+    final balance = _balances.where((b) => b.personnelId == r.id).toList();
     return ListTile(
       title: Text(r.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Text(
         [r.department, r.employeeNo].where((e) => e != null && e.isNotEmpty).join(' · '),
       ),
-      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_canSeeBalances && balance.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text('${formatDays(balance.first.remaining)} gün kaldı',
+                  style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
+          const Icon(Icons.chevron_right, color: Colors.grey),
+        ],
+      ),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => LeaveListDetailScreen(personnel: r)),
       ),

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
@@ -37,7 +38,8 @@ export default function LeaveListPage() {
     enabled: canSeeBalances,
   });
 
-  const year = new Date().getFullYear();
+  const thisYear = new Date().getFullYear();
+  const [year, setYear] = useState(thisYear);
   const downloadPdf = useMutation({
     mutationFn: () => api.openProtectedFile(`/leave/balance/all/pdf?year=${year}`),
     onError: (e: any) => toast.error(e.response?.data?.message || 'Açılamadı'),
@@ -51,13 +53,24 @@ export default function LeaveListPage() {
           <h1 className="text-2xl font-bold text-gray-900">İzin Listesi</h1>
         </div>
         {canSeeBalances && (
-          <button
-            onClick={() => downloadPdf.mutate()}
-            disabled={downloadPdf.isPending}
-            className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50"
-          >
-            <Eye size={16} /> PDF Görüntüle
-          </button>
+          <div className="flex items-center gap-2">
+            <select
+              className="input w-auto"
+              value={year}
+              onChange={(e) => setYear(+e.target.value)}
+            >
+              {[thisYear, thisYear - 1, thisYear - 2, thisYear - 3].map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => downloadPdf.mutate()}
+              disabled={downloadPdf.isPending}
+              className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50"
+            >
+              <Eye size={16} /> PDF Görüntüle
+            </button>
+          </div>
         )}
       </div>
       <p className="text-sm text-gray-500">

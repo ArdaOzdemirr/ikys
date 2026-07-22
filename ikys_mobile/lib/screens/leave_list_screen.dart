@@ -45,10 +45,9 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _viewPdf() async {
+  Future<void> _viewPdf(int year) async {
     setState(() => _downloadingPdf = true);
     try {
-      final year = DateTime.now().year;
       await ApiClient.instance.openFileUrl(
         '/leave/balance/all/pdf?year=$year',
         fileName: 'izin-tablosu-$year.pdf',
@@ -69,15 +68,29 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
         title: const Text('İzin Listesi'),
         actions: [
           if (_canSeeBalances)
-            IconButton(
-              icon: _downloadingPdf
-                  ? const SizedBox(
+            _downloadingPdf
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: SizedBox(
                       width: 20, height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.picture_as_pdf_outlined),
-              tooltip: 'PDF Görüntüle',
-              onPressed: _downloadingPdf ? null : _viewPdf,
-            ),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    ),
+                  )
+                : PopupMenuButton<int>(
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    tooltip: 'PDF Görüntüle',
+                    onSelected: _viewPdf,
+                    itemBuilder: (context) {
+                      final thisYear = DateTime.now().year;
+                      return List.generate(
+                        4,
+                        (i) => PopupMenuItem(
+                          value: thisYear - i,
+                          child: Text('${thisYear - i} yılı'),
+                        ),
+                      );
+                    },
+                  ),
         ],
       ),
       body: _loading

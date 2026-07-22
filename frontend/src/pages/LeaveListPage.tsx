@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { ListChecks, ChevronRight, Download } from 'lucide-react';
+import { ListChecks, ChevronRight, Eye } from 'lucide-react';
 
 interface PersonnelRow {
   id: string;
@@ -39,8 +39,8 @@ export default function LeaveListPage() {
 
   const year = new Date().getFullYear();
   const downloadPdf = useMutation({
-    mutationFn: () => api.download(`/leave/balance/all/pdf?year=${year}`, `izin-tablosu-${year}.pdf`),
-    onError: (e: any) => toast.error(e.response?.data?.message || 'İndirilemedi'),
+    mutationFn: () => api.openProtectedFile(`/leave/balance/all/pdf?year=${year}`),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Açılamadı'),
   });
 
   return (
@@ -56,7 +56,7 @@ export default function LeaveListPage() {
             disabled={downloadPdf.isPending}
             className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50"
           >
-            <Download size={16} /> PDF İndir
+            <Eye size={16} /> PDF Görüntüle
           </button>
         )}
       </div>

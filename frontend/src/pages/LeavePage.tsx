@@ -81,8 +81,8 @@ export default function LeavePage() {
   });
 
   const downloadDoc = useMutation({
-    mutationFn: (id: string) => api.download(`/leave/requests/${id}/document`, `izin-onay-belgesi-${id}.pdf`),
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Belge indirilemedi'),
+    mutationFn: (id: string) => api.openProtectedFile(`/leave/requests/${id}/document`),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Belge açılamadı'),
   });
 
   const cancel = useMutation({
@@ -307,7 +307,7 @@ export default function LeavePage() {
                         onClick={() => downloadDoc.mutate(r.id)}
                         className="text-brand-600 hover:underline text-xs"
                       >
-                        Belge İndir
+                        Belge Görüntüle
                       </button>
                     )}
                     {r.status === 'PENDING' && (

@@ -115,6 +115,8 @@ export class PersonnelService {
         department: { select: { name: true } },
         position: { select: { title: true } },
         manager: { select: { firstName: true, lastName: true } },
+        documents: true,
+        salaryConfig: true,
       },
     });
     if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -16,12 +17,27 @@ import { DocumentsService } from './documents.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { PrismaService } from '../../config/prisma.service';
 
 @ApiTags('documents')
 @ApiBearerAuth()
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly service: DocumentsService) {}
+  constructor(
+    private readonly service: DocumentsService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  /** Çağıranın kendi belgesi mi, yoksa HR/Admin mi kontrol eder. */
+  private async assertOwnerOrHr(userId: string, role: string, ownerPersonnelId: string) {
+    if (role === Role.HR || role === Role.ADMIN) return;
+    const me = await this.prisma.personnel.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (me?.id === ownerPersonnelId) return;
+    throw new ForbiddenException('Bu belgeye erişim yetkiniz yok');
+  }
 
   @Post('upload/:personnelId')
   @Roles(Role.ADMIN, Role.HR)
@@ -47,13 +63,26 @@ export class DocumentsController {
   }
 
   @Get('personnel/:personnelId')
-  list(@Param('personnelId') personnelId: string) {
+  @ApiOperation({ summary: 'Belge listesi (sadece sahibi ya da HR/Admin görebilir)' })
+  async list(
+    @Param('personnelId') personnelId: string,
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    await this.assertOwnerOrHr(userId, role, personnelId);
     return this.service.listForPersonnel(personnelId);
   }
 
   @Get('file/:fileName')
-  async download(@Param('fileName') fileName: string, @Res() res: Response) {
-    const { buffer, mimeType, originalName } = await this.service.getFile(fileName);
+  @ApiOperation({ summary: 'Belge dosyasını indir (sadece sahibi ya da HR/Admin)' })
+  async download(
+    @Param('fileName') fileName: string,
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, mimeType, originalName, personnelId } = await this.service.getFile(fileName);
+    await this.assertOwnerOrHr(userId, role, personnelId);
     res.set({
       'Content-Type': mimeType,
       'Content-Disposition': `inline; filename="${encodeURIComponent(originalName)}"`,

@@ -77,13 +77,15 @@ export class DocumentsService {
     });
   }
 
-  async getFile(fileName: string): Promise<{ buffer: Buffer; mimeType: string; originalName: string }> {
+  async getFile(
+    fileName: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; originalName: string; personnelId: string }> {
     const filePath = path.join(this.uploadDir, fileName);
     if (!fs.existsSync(filePath)) {
       throw new NotFoundException('Dosya bulunamadı');
     }
 
-    // DB'den dokümanı al (mime type ve orijinal ad için)
+    // DB'den dokümanı al (mime type, orijinal ad ve sahiplik kontrolü için)
     const doc = await this.prisma.document.findFirst({
       where: { fileUrl: { contains: fileName } },
     });
@@ -93,6 +95,7 @@ export class DocumentsService {
       buffer: fs.readFileSync(filePath),
       mimeType: doc.mimeType,
       originalName: doc.fileName,
+      personnelId: doc.personnelId,
     };
   }
 

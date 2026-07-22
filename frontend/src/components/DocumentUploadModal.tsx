@@ -175,15 +175,13 @@ export default function DocumentUploadModal({ open, onClose, personnelId, person
                         <span>{new Date(d.uploadedAt).toLocaleDateString('tr-TR')}</span>
                       </div>
                     </div>
-                    <a
-                      href={d.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => api.openProtectedFile(d.fileUrl)}
                       className="text-brand-600 hover:bg-brand-50 p-2 rounded"
                       title="Görüntüle/İndir"
                     >
                       <Download size={16} />
-                    </a>
+                    </button>
                     {canManage && (
                       <button
                         onClick={() => {

@@ -106,9 +106,9 @@ export default function PersonnelDetailPage() {
                 <FileText className="text-brand-600" size={16} />
                 <span className="text-sm flex-1 truncate">{d.fileName}</span>
                 <span className="badge bg-blue-100 text-blue-800 text-xs">{d.type}</span>
-                <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline text-xs">
+                <button onClick={() => api.openProtectedFile(d.fileUrl)} className="text-brand-600 hover:underline text-xs">
                   Görüntüle
-                </a>
+                </button>
               </li>
             ))}
             {p.documents.length > 3 && (

@@ -1040,8 +1040,14 @@ export class LeaveService {
    * tüm aktif personel için tek sayfa halinde.
    */
   async generateYearlyBulkPdf(year: number): Promise<Buffer> {
+    // İK ve hiyerarşinin en tepesindeki (yöneticisi olmayan) admin, bu raporun
+    // takip ettiği "normal" izin süreci dışında sayılır — listeye girmesin.
     const personnel = await this.prisma.personnel.findMany({
-      where: { status: 'ACTIVE' },
+      where: {
+        status: 'ACTIVE',
+        managerId: { not: null },
+        user: { role: { not: Role.HR } },
+      },
       select: { id: true, firstName: true, lastName: true, employeeNo: true, hireDate: true },
       orderBy: [{ firstName: 'asc' }],
     });
@@ -1073,10 +1079,10 @@ export class LeaveService {
       doc.moveDown(1);
 
       const cols: { label: string; width: number }[] = [
-        { label: 'Personel', width: 110 },
-        { label: 'İşe Giriş', width: 55 },
+        { label: 'Personel', width: 100 },
+        { label: 'İşe Giriş', width: 50 },
         { label: 'Eklenen', width: 42 },
-        { label: 'Yıl Sonu Kalan', width: 65 },
+        { label: 'Yıl Sonu Kalan', width: 80 },
         ...LeaveService.MONTHS_SHORT.map((m) => ({ label: m, width: 30 })),
         { label: 'Kalan', width: 42 },
         { label: 'Ücretsiz', width: 48 },
@@ -1084,30 +1090,38 @@ export class LeaveService {
       ];
       const startX = doc.page.margins.left;
       const tableWidth = cols.reduce((s, c) => s + c.width, 0);
+      const rowHeight = 16;
+      const pageBottom = doc.page.height - doc.page.margins.bottom;
+      let y = doc.y;
+
+      // Tek bir satırı, hücreleri çizgiyle ayrılmış gerçek bir tablo satırı
+      // gibi çizer (dış çerçeve + sütun ayraçları).
+      const drawGridRow = (values: string[], bold: boolean, height = rowHeight) => {
+        doc.rect(startX, y, tableWidth, height).strokeColor('#cccccc').stroke();
+        let x = startX;
+        doc.font(bold ? 'DejaVu-Bold' : 'DejaVu').fontSize(7.5);
+        for (let i = 0; i < cols.length; i++) {
+          if (i > 0) {
+            doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#cccccc').stroke();
+          }
+          doc.text(values[i], x + 3, y + 4, { width: cols[i].width - 6 });
+          x += cols[i].width;
+        }
+        y += height;
+      };
 
       const drawHeader = () => {
-        let x = startX;
-        const y = doc.y;
-        doc.font('DejaVu-Bold').fontSize(7.5);
-        for (const c of cols) {
-          doc.text(c.label, x, y, { width: c.width });
-          x += c.width;
-        }
-        doc.moveDown(0.7);
-        doc.moveTo(startX, doc.y).lineTo(startX + tableWidth, doc.y).strokeColor('#cccccc').stroke();
-        doc.moveDown(0.25);
-        doc.font('DejaVu').fontSize(7.5);
+        drawGridRow(cols.map((c) => c.label), true, 24);
       };
 
       drawHeader();
 
       for (const r of rows) {
-        if (doc.y > doc.page.height - doc.page.margins.bottom - 20) {
+        if (y > pageBottom - rowHeight) {
           doc.addPage();
+          y = doc.page.margins.top;
           drawHeader();
         }
-        let x = startX;
-        const y = doc.y;
         const values = [
           `${r.firstName} ${r.lastName}`,
           dayjs(r.hireDate).format('DD.MM.YY'),
@@ -1118,11 +1132,7 @@ export class LeaveService {
           r.b.ucretsiz ? this.fmtDays(r.b.ucretsiz) : '-',
           r.b.rapor ? this.fmtDays(r.b.rapor) : '-',
         ];
-        values.forEach((v, i) => {
-          doc.text(v, x, y, { width: cols[i].width });
-          x += cols[i].width;
-        });
-        doc.moveDown(0.55);
+        drawGridRow(values, false);
       }
 
       doc.end();

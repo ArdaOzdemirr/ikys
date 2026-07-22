@@ -162,6 +162,36 @@ export class LeaveController {
     return this.service.allAnnualBalances();
   }
 
+  @Get('balance/all/pdf')
+  @Roles(Role.HR, Role.ADMIN)
+  @ApiOperation({ summary: 'Tüm personelin yıllık izin tablosunu (Excel formatına benzer) PDF olarak indir' })
+  async allBalancesPdf(@Query('year') year: string | undefined, @Res() res: Response) {
+    const y = year ? +year : new Date().getFullYear();
+    const buffer = await this.service.generateYearlyBulkPdf(y);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="izin-tablosu-${y}.pdf"`,
+    });
+    res.send(buffer);
+  }
+
+  @Get('balance/:personnelId/pdf')
+  @Roles(Role.HR, Role.ADMIN)
+  @ApiOperation({ summary: 'Tek bir personelin yıllık izin dökümünü PDF olarak indir' })
+  async personBalancePdf(
+    @Param('personnelId') personnelId: string,
+    @Query('year') year: string | undefined,
+    @Res() res: Response,
+  ) {
+    const y = year ? +year : new Date().getFullYear();
+    const buffer = await this.service.generatePersonYearlyPdf(personnelId, y);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="izin-dokumu-${personnelId}-${y}.pdf"`,
+    });
+    res.send(buffer);
+  }
+
   @Get('list/personnel')
   @Roles(Role.MANAGER, Role.HR, Role.ACCOUNTING, Role.ADMIN)
   @ApiOperation({ summary: 'İzin Listesi\'nde seçilebilecek personel (role/hiyerarşiye göre)' })

@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '../services/api';
-import { CalendarDays } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { CalendarDays, Download } from 'lucide-react';
 
 interface Row {
   personnelId: string;
@@ -18,11 +19,26 @@ export default function LeaveBalancesPage() {
     queryFn: () => api.get('/leave/balance/all'),
   });
 
+  const year = new Date().getFullYear();
+  const downloadPdf = useMutation({
+    mutationFn: () => api.download(`/leave/balance/all/pdf?year=${year}`, `izin-tablosu-${year}.pdf`),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'İndirilemedi'),
+  });
+
   return (
     <div className="p-8 space-y-6 max-w-2xl">
-      <div className="flex items-center gap-2">
-        <CalendarDays className="text-brand-600" />
-        <h1 className="text-2xl font-bold text-gray-900">Personel İzin Bakiyeleri</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="text-brand-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Personel İzin Bakiyeleri</h1>
+        </div>
+        <button
+          onClick={() => downloadPdf.mutate()}
+          disabled={downloadPdf.isPending}
+          className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50"
+        >
+          <Download size={16} /> PDF İndir
+        </button>
       </div>
 
       <div className="card p-0 divide-y divide-gray-200">

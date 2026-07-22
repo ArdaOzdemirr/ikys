@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, ListChecks, Clock } from 'lucide-react';
+import { ArrowLeft, ListChecks, Clock, Download } from 'lucide-react';
 
 const TYPE_LABELS: Record<string, string> = {
   ANNUAL: 'Yıllık İzin',
@@ -55,6 +55,14 @@ export default function LeaveListDetailPage() {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Belge indirilemedi'),
   });
 
+  const downloadYearlyReport = useMutation({
+    mutationFn: () => api.download(
+      `/leave/balance/${personnelId}/pdf?year=${yr || year}`,
+      `izin-dokumu-${personnelId}-${yr || year}.pdf`,
+    ),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'İndirilemedi'),
+  });
+
   const grantHourly = useMutation({
     mutationFn: () => api.post('/leave/requests/hourly', { personnelId, ...hourlyForm }),
     onSuccess: () => {
@@ -87,9 +95,18 @@ export default function LeaveListDetailPage() {
             {person ? `${person.firstName} ${person.lastName}` : 'İzin Geçmişi'}
           </h1>
         </div>
-        <button onClick={() => setShowHourly(!showHourly)} className="btn-secondary flex items-center gap-2 text-sm">
-          <Clock size={16} /> Saatlik İzin Ver
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => downloadYearlyReport.mutate()}
+            disabled={downloadYearlyReport.isPending}
+            className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50"
+          >
+            <Download size={16} /> Yıllık Rapor İndir
+          </button>
+          <button onClick={() => setShowHourly(!showHourly)} className="btn-secondary flex items-center gap-2 text-sm">
+            <Clock size={16} /> Saatlik İzin Ver
+          </button>
+        </div>
       </div>
       {person && <p className="text-sm text-gray-500">{person.department?.name ?? '-'}</p>}
 

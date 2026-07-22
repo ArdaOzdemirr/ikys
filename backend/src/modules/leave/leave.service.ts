@@ -932,6 +932,329 @@ export class LeaveService {
     );
   }
 
+  private static readonly MONTHS_SHORT = [
+    'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara',
+  ];
+
+  /**
+   * Şirketin daha önce elle tuttuğu Excel'deki (yıl bazlı sayfa: personel +
+   * hakedilen/eklenen + ay ay kullanım + kalan) mantığın aynısı, canlı
+   * veriden hesaplanır. Doğrulama: Savaş için 2026 yılına göre üretilen
+   * "yıl sonu kalan" (36.5) + "eklenen" (20) - "bu yıl kullanılan" (13) =
+   * "kalan" (43.5) — Excel'deki değerlerle birebir eşleşiyor.
+   */
+  private async yearlyBreakdown(
+    personnelId: string,
+    hireDate: Date,
+    year: number,
+  ) {
+    const anniversaryThis = new Date(hireDate);
+    anniversaryThis.setFullYear(year);
+    const anniversaryLast = new Date(hireDate);
+    anniversaryLast.setFullYear(year - 1);
+
+    const entitledThis = cumulativeAnnualLeaveEntitlement(hireDate, anniversaryThis);
+    const entitledLast = cumulativeAnnualLeaveEntitlement(hireDate, anniversaryLast);
+    const eklenen = entitledThis - entitledLast;
+
+    const yearStart = new Date(year, 0, 1);
+    const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
+
+    const balRows = await this.prisma.leaveBalance.findMany({
+      where: { personnelId, type: LeaveType.ANNUAL },
+    });
+    const totalUsedNow = balRows.reduce((s, r) => s + r.usedDays, 0);
+
+    // Bu yıla ait, aya göre kırılmış kullanım (yalnızca gerçek, tarihli
+    // taleplerden; içe aktarılan tarihsiz "düzeltme" havuzu buna dahil değil).
+    const yearRequests = await this.prisma.leaveRequest.findMany({
+      where: {
+        personnelId,
+        status: LeaveStatus.APPROVED,
+        startDate: { gte: yearStart, lte: yearEnd },
+        OR: [{ type: LeaveType.ANNUAL }, { category: { affectsAnnualBalance: true } }],
+      },
+      select: { startDate: true, totalDays: true },
+    });
+    const monthly = new Array(12).fill(0);
+    for (const r of yearRequests) monthly[r.startDate.getMonth()] += r.totalDays;
+    const usedThisYear = monthly.reduce((s, v) => s + v, 0);
+
+    // "Şimdi"den bu yılın sonrasına ait (henüz gerçekleşmemiş/gelecek) kullanım
+    // varsa çıkar; yıl geçmişse zaten hiçbir şey düşmez.
+    const afterYearRequests = await this.prisma.leaveRequest.findMany({
+      where: {
+        personnelId,
+        status: LeaveStatus.APPROVED,
+        startDate: { gt: yearEnd },
+        OR: [{ type: LeaveType.ANNUAL }, { category: { affectsAnnualBalance: true } }],
+      },
+      select: { totalDays: true },
+    });
+    const usedAfterYear = afterYearRequests.reduce((s, r) => s + r.totalDays, 0);
+    const usedUpToEndOfYear = totalUsedNow - usedAfterYear;
+    const usedBeforeYear = usedUpToEndOfYear - usedThisYear;
+
+    const yilSonuKalan = entitledLast - usedBeforeYear;
+    const kalan = entitledThis - usedUpToEndOfYear;
+
+    const unpaidRows = await this.prisma.leaveRequest.findMany({
+      where: {
+        personnelId,
+        status: LeaveStatus.APPROVED,
+        type: LeaveType.UNPAID,
+        startDate: { gte: yearStart, lte: yearEnd },
+      },
+      select: { totalDays: true },
+    });
+    const ucretsiz = unpaidRows.reduce((s, r) => s + r.totalDays, 0);
+
+    const sickRows = await this.prisma.leaveRequest.findMany({
+      where: {
+        personnelId,
+        status: LeaveStatus.APPROVED,
+        type: LeaveType.SICK,
+        startDate: { gte: yearStart, lte: yearEnd },
+      },
+      select: { totalDays: true },
+    });
+    const rapor = sickRows.reduce((s, r) => s + r.totalDays, 0);
+
+    return {
+      anniversaryThis,
+      eklenen,
+      yilSonuKalan,
+      monthly,
+      kalan,
+      ucretsiz,
+      rapor,
+    };
+  }
+
+  private fmtDays(n: number): string {
+    return n === Math.trunc(n) ? `${n}` : n.toFixed(2).replace('.', ',');
+  }
+
+  /**
+   * Şirketin Excel'deki yıllık izin tablosunun (personel x ay) PDF karşılığı,
+   * tüm aktif personel için tek sayfa halinde.
+   */
+  async generateYearlyBulkPdf(year: number): Promise<Buffer> {
+    const personnel = await this.prisma.personnel.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, firstName: true, lastName: true, employeeNo: true, hireDate: true },
+      orderBy: [{ firstName: 'asc' }],
+    });
+
+    const rows = await Promise.all(
+      personnel.map(async (p) => ({
+        ...p,
+        b: await this.yearlyBreakdown(p.id, p.hireDate, year),
+      })),
+    );
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 25, layout: 'landscape' });
+      const chunks: Buffer[] = [];
+      doc.on('data', (c) => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.registerFont('DejaVu', path.join(this.fontsDir, 'DejaVuSans.ttf'));
+      doc.registerFont('DejaVu-Bold', path.join(this.fontsDir, 'DejaVuSans-Bold.ttf'));
+      doc.font('DejaVu');
+
+      doc.font('DejaVu-Bold').fontSize(15).text(`${year} YILLIK İZİN TABLOSU`, { align: 'center' });
+      doc.font('DejaVu').fontSize(8).fillColor('gray').text(
+        `Oluşturulma tarihi: ${dayjs().format('DD.MM.YYYY HH:mm')}`,
+        { align: 'center' },
+      );
+      doc.fillColor('black');
+      doc.moveDown(1);
+
+      const cols: { label: string; width: number }[] = [
+        { label: 'Personel', width: 110 },
+        { label: 'İşe Giriş', width: 55 },
+        { label: 'Eklenen', width: 42 },
+        { label: 'Yıl Sonu Kalan', width: 65 },
+        ...LeaveService.MONTHS_SHORT.map((m) => ({ label: m, width: 30 })),
+        { label: 'Kalan', width: 42 },
+        { label: 'Ücretsiz', width: 48 },
+        { label: 'Rapor', width: 42 },
+      ];
+      const startX = doc.page.margins.left;
+      const tableWidth = cols.reduce((s, c) => s + c.width, 0);
+
+      const drawHeader = () => {
+        let x = startX;
+        const y = doc.y;
+        doc.font('DejaVu-Bold').fontSize(7.5);
+        for (const c of cols) {
+          doc.text(c.label, x, y, { width: c.width });
+          x += c.width;
+        }
+        doc.moveDown(0.7);
+        doc.moveTo(startX, doc.y).lineTo(startX + tableWidth, doc.y).strokeColor('#cccccc').stroke();
+        doc.moveDown(0.25);
+        doc.font('DejaVu').fontSize(7.5);
+      };
+
+      drawHeader();
+
+      for (const r of rows) {
+        if (doc.y > doc.page.height - doc.page.margins.bottom - 20) {
+          doc.addPage();
+          drawHeader();
+        }
+        let x = startX;
+        const y = doc.y;
+        const values = [
+          `${r.firstName} ${r.lastName}`,
+          dayjs(r.hireDate).format('DD.MM.YY'),
+          this.fmtDays(r.b.eklenen),
+          this.fmtDays(r.b.yilSonuKalan),
+          ...r.b.monthly.map((m) => (m ? this.fmtDays(m) : '-')),
+          this.fmtDays(r.b.kalan),
+          r.b.ucretsiz ? this.fmtDays(r.b.ucretsiz) : '-',
+          r.b.rapor ? this.fmtDays(r.b.rapor) : '-',
+        ];
+        values.forEach((v, i) => {
+          doc.text(v, x, y, { width: cols[i].width });
+          x += cols[i].width;
+        });
+        doc.moveDown(0.55);
+      }
+
+      doc.end();
+    });
+  }
+
+  /** Tek bir personelin yıllık izin dökümü (Excel'deki "izin detay" sayfası gibi). */
+  async generatePersonYearlyPdf(personnelId: string, year: number): Promise<Buffer> {
+    const p = await this.prisma.personnel.findUnique({
+      where: { id: personnelId },
+      include: { department: true },
+    });
+    if (!p) throw new NotFoundException('Personel kaydı bulunamadı');
+
+    const b = await this.yearlyBreakdown(personnelId, p.hireDate, year);
+
+    const yearStart = new Date(year, 0, 1);
+    const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
+    const takenLeaves = await this.prisma.leaveRequest.findMany({
+      where: {
+        personnelId,
+        status: LeaveStatus.APPROVED,
+        startDate: { gte: yearStart, lte: yearEnd },
+      },
+      include: { category: true },
+      orderBy: { startDate: 'asc' },
+    });
+
+    const typeLabels: Record<string, string> = {
+      ANNUAL: 'Yıllık İzin', HALF_DAY: 'Yarım Gün İzin', HOURLY: 'Saatlik İzin',
+      EXCUSE: 'Mazeret İzni', SICK: 'Sağlık Raporu', MATERNITY: 'Doğum İzni',
+      PATERNITY: 'Babalık İzni', MARRIAGE: 'Evlilik İzni', BEREAVEMENT: 'Vefat İzni',
+      UNPAID: 'Ücretsiz İzin',
+    };
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (c) => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.registerFont('DejaVu', path.join(this.fontsDir, 'DejaVuSans.ttf'));
+      doc.registerFont('DejaVu-Bold', path.join(this.fontsDir, 'DejaVuSans-Bold.ttf'));
+      doc.font('DejaVu');
+
+      doc.font('DejaVu-Bold').fontSize(16).text(`${year} YILLIK İZİN DÖKÜMÜ`, { align: 'center' });
+      doc.moveDown(1);
+
+      doc.font('DejaVu-Bold').fontSize(12).text(`${p.firstName} ${p.lastName}`);
+      doc.font('DejaVu').fontSize(10);
+      doc.text(`Sicil No: ${p.employeeNo}`);
+      doc.text(`Departman: ${p.department?.name ?? '-'}`);
+      doc.text(`İşe Giriş: ${dayjs(p.hireDate).format('DD.MM.YYYY')}`);
+      doc.moveDown(1);
+
+      const cards = [
+        [`${year} Eklenen`, `${this.fmtDays(b.eklenen)} gün`],
+        ['Yıl Sonu Kalan', `${this.fmtDays(b.yilSonuKalan)} gün`],
+        ['Kalan', `${this.fmtDays(b.kalan)} gün`],
+        ['Ücretsiz İzin', `${this.fmtDays(b.ucretsiz)} gün`],
+        ['Rapor', `${this.fmtDays(b.rapor)} gün`],
+      ];
+      const cardWidth = (doc.page.width - 100) / cards.length;
+      const cardY = doc.y;
+      cards.forEach(([label, value], i) => {
+        const x = 50 + i * cardWidth;
+        doc.font('DejaVu-Bold').fontSize(9).text(value, x, cardY, { width: cardWidth - 5 });
+        doc.font('DejaVu').fontSize(8).fillColor('gray').text(label, x, cardY + 14, { width: cardWidth - 5 });
+        doc.fillColor('black');
+      });
+      doc.y = cardY + 40;
+      doc.moveDown(1);
+
+      doc.font('DejaVu-Bold').fontSize(11).text('İZİN GEÇMİŞİ');
+      doc.moveDown(0.5);
+
+      const cols = [
+        { label: 'Başlangıç', width: 90 },
+        { label: 'Bitiş', width: 90 },
+        { label: 'Gün', width: 60 },
+        { label: 'Tür', width: 140 },
+      ];
+      const startX = doc.page.margins.left;
+      const tableWidth = cols.reduce((s, c) => s + c.width, 0);
+
+      const drawHeader = () => {
+        let x = startX;
+        const y = doc.y;
+        doc.font('DejaVu-Bold').fontSize(9);
+        for (const c of cols) {
+          doc.text(c.label, x, y, { width: c.width });
+          x += c.width;
+        }
+        doc.moveDown(0.5);
+        doc.moveTo(startX, doc.y).lineTo(startX + tableWidth, doc.y).strokeColor('#cccccc').stroke();
+        doc.moveDown(0.3);
+        doc.font('DejaVu').fontSize(9);
+      };
+
+      drawHeader();
+
+      if (takenLeaves.length === 0) {
+        doc.fillColor('gray').text('Bu yıl için kayıtlı izin yok.');
+        doc.fillColor('black');
+      }
+
+      for (const r of takenLeaves) {
+        if (doc.y > doc.page.height - doc.page.margins.bottom - 30) {
+          doc.addPage();
+          drawHeader();
+        }
+        let x = startX;
+        const y = doc.y;
+        const typeName = r.category?.name ?? (r.type ? typeLabels[r.type] ?? r.type : '-');
+        const values = [
+          dayjs(r.startDate).format('DD.MM.YYYY'),
+          dayjs(r.endDate).format('DD.MM.YYYY'),
+          `${this.fmtDays(r.totalDays)} gün`,
+          typeName,
+        ];
+        values.forEach((v, i) => {
+          doc.text(v, x, y, { width: cols[i].width });
+          x += cols[i].width;
+        });
+        doc.moveDown(0.6);
+      }
+
+      doc.end();
+    });
+  }
+
   /**
    * İzin talebini siler. Sahibi kendi talebini, HR/ADMIN ise herkesinkini silebilir.
    * Onaylı + ücretli + bir yıla yazılmış izinlerde bakiye iade edilir.

@@ -1476,15 +1476,50 @@ export class LeaveService {
   }
 
   // ============= TATİLLER =============
-  listHolidays(year?: number) {
-    const where: any = {};
-    if (year) {
-      where.OR = [
-        { date: { gte: new Date(year, 0, 1), lt: new Date(year + 1, 0, 1) } },
-        { recurring: true },
-      ];
-    }
-    return this.prisma.holiday.findMany({ where, orderBy: { date: 'asc' } });
+  /**
+   * Belirtilen yılın tüm resmi tatilleri. Sabit tarihli (recurring) tatiller
+   * DB'de hangi yıl kaydedilmiş olursa olsun, gösterilen yıla göre ay/gün
+   * korunarak tarihi o yıla uyarlanır (yoksa hep kayıtlı oldukları yıl
+   * görünür — bkz. eski hata: hepsi "2025" gösteriyordu).
+   */
+  async listHolidays(year?: number) {
+    const y = year ?? new Date().getFullYear();
+    const rows = await this.prisma.holiday.findMany({
+      where: {
+        OR: [
+          { date: { gte: new Date(Date.UTC(y, 0, 1)), lt: new Date(Date.UTC(y + 1, 0, 1)) } },
+          { recurring: true },
+        ],
+      },
+    });
+    return rows
+      .map((h) => {
+        if (!h.recurring) return h;
+        const d = new Date(h.date);
+        // Date.UTC ile: sunucunun/istemcinin çalıştığı saat dilimi ne olursa
+        // olsun, tarih doğru gün olarak sabit kalır (yerel new Date(y,m,d)
+        // yerel gece yarısını kullanır, UTC'ye çevrilince bir gün kayabilir).
+        return { ...h, date: new Date(Date.UTC(y, d.getUTCMonth(), d.getUTCDate())) };
+      })
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }
+
+  /**
+   * Bugünden itibaren gelecekteki resmi tatiller (bu yıl + gelecek yıl,
+   * recurring olanlar ilgili yıla uyarlanmış hâlde), en yakından uzağa sıralı.
+   */
+  async upcomingHolidays(limit = 10) {
+    const now = new Date();
+    const thisYear = now.getFullYear();
+    const [thisYearRows, nextYearRows] = await Promise.all([
+      this.listHolidays(thisYear),
+      this.listHolidays(thisYear + 1),
+    ]);
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    return [...thisYearRows, ...nextYearRows]
+      .filter((h) => h.date >= today)
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .slice(0, limit);
   }
 
   createHoliday(data: any) {

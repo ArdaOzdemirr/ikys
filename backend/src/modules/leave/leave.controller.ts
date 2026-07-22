@@ -222,6 +222,12 @@ export class LeaveController {
   }
 
   // Tatiller
+  @Get('holidays/upcoming')
+  @ApiOperation({ summary: 'Bugünden itibaren yaklaşan resmi tatiller' })
+  upcomingHolidays() {
+    return this.service.upcomingHolidays();
+  }
+
   @Get('holidays')
   holidays(@Query('year') year?: string) {
     return this.service.listHolidays(year ? +year : undefined);

@@ -125,7 +125,7 @@ async function main() {
   });
   console.log('✅ Çalışan: mehmet@firma.com / Emp123456!');
 
-  // === Resmi tatiller (TR 2025 - örnek) ===
+  // === Resmi tatiller: sabit tarihli (her yıl aynı gün, recurring) ===
   const holidays = [
     { name: 'Yılbaşı', date: '2025-01-01', recurring: true },
     { name: 'Ulusal Egemenlik ve Çocuk Bayramı', date: '2025-04-23', recurring: true },
@@ -140,6 +140,50 @@ async function main() {
       where: { name_date: { name: h.name, date: new Date(h.date) } },
       update: {},
       create: { name: h.name, date: new Date(h.date), recurring: h.recurring },
+    });
+  }
+
+  // === Dini bayramlar: hicri takvime göre her yıl kayan tarihler (recurring
+  // olamaz, her yıl tek tek girilir). Diyanet'in resmen açıkladığı 2026/2027
+  // tarihleri kesin; 2028 ay gözlemine bağlı olduğundan tahminidir — yaklaşan
+  // yıl geldiğinde Diyanet'in resmi açıklamasıyla teyit/güncelleme yapılmalı.
+  const religiousHolidays = [
+    // 2026
+    { name: 'Ramazan Bayramı Arifesi', date: '2026-03-19' },
+    { name: 'Ramazan Bayramı (1. Gün)', date: '2026-03-20' },
+    { name: 'Ramazan Bayramı (2. Gün)', date: '2026-03-21' },
+    { name: 'Ramazan Bayramı (3. Gün)', date: '2026-03-22' },
+    { name: 'Kurban Bayramı Arifesi', date: '2026-05-26' },
+    { name: 'Kurban Bayramı (1. Gün)', date: '2026-05-27' },
+    { name: 'Kurban Bayramı (2. Gün)', date: '2026-05-28' },
+    { name: 'Kurban Bayramı (3. Gün)', date: '2026-05-29' },
+    { name: 'Kurban Bayramı (4. Gün)', date: '2026-05-30' },
+    // 2027
+    { name: 'Ramazan Bayramı Arifesi', date: '2027-03-08' },
+    { name: 'Ramazan Bayramı (1. Gün)', date: '2027-03-09' },
+    { name: 'Ramazan Bayramı (2. Gün)', date: '2027-03-10' },
+    { name: 'Ramazan Bayramı (3. Gün)', date: '2027-03-11' },
+    { name: 'Kurban Bayramı Arifesi', date: '2027-05-15' },
+    { name: 'Kurban Bayramı (1. Gün)', date: '2027-05-16' },
+    { name: 'Kurban Bayramı (2. Gün)', date: '2027-05-17' },
+    { name: 'Kurban Bayramı (3. Gün)', date: '2027-05-18' },
+    { name: 'Kurban Bayramı (4. Gün)', date: '2027-05-19' },
+    // 2028 (tahmini — Diyanet resmi açıklaması yapılınca teyit edilmeli)
+    { name: 'Ramazan Bayramı Arifesi', date: '2028-02-25' },
+    { name: 'Ramazan Bayramı (1. Gün)', date: '2028-02-26' },
+    { name: 'Ramazan Bayramı (2. Gün)', date: '2028-02-27' },
+    { name: 'Ramazan Bayramı (3. Gün)', date: '2028-02-28' },
+    { name: 'Kurban Bayramı Arifesi', date: '2028-05-04' },
+    { name: 'Kurban Bayramı (1. Gün)', date: '2028-05-05' },
+    { name: 'Kurban Bayramı (2. Gün)', date: '2028-05-06' },
+    { name: 'Kurban Bayramı (3. Gün)', date: '2028-05-07' },
+    { name: 'Kurban Bayramı (4. Gün)', date: '2028-05-08' },
+  ];
+  for (const h of religiousHolidays) {
+    await prisma.holiday.upsert({
+      where: { name_date: { name: h.name, date: new Date(h.date) } },
+      update: {},
+      create: { name: h.name, date: new Date(h.date), recurring: false },
     });
   }
 

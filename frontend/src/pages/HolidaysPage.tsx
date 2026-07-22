@@ -2,13 +2,58 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
-import { Calendar, Plus, Repeat, Trash2 } from 'lucide-react';
+import { Calendar, Plus, Repeat, Trash2, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
+const fmt = (d: string) => new Date(d).toLocaleDateString('tr-TR', {
+  weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+});
+
 export default function HolidaysPage() {
-  const qc = useQueryClient();
   const { hasRole } = useAuth();
   const canManage = hasRole('HR', 'ADMIN');
+  const [tab, setTab] = useState<'all' | 'upcoming'>('all');
+
+  return (
+    <div className="p-8 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <Calendar className="text-brand-600" />
+          {canManage ? 'Resmi Tatil Yönetimi' : 'Resmi Tatiller'}
+        </h1>
+        <p className="text-gray-600 text-sm">
+          İzin hesaplamasında kullanılacak tatil günleri (Belge: Dinamik Takvim)
+        </p>
+      </div>
+
+      <div className="flex gap-2 border-b border-gray-200">
+        <button
+          onClick={() => setTab('all')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${
+            tab === 'all' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Calendar size={16} /> Bütün Resmi Tatiller
+        </button>
+        <button
+          onClick={() => setTab('upcoming')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${
+            tab === 'upcoming' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Clock size={16} /> Yaklaşan Tatiller
+        </button>
+      </div>
+
+      {tab === 'all' ? <AllHolidaysTab canManage={canManage} /> : <UpcomingHolidaysTab />}
+    </div>
+  );
+}
+
+function AllHolidaysTab({ canManage }: { canManage: boolean }) {
+  const qc = useQueryClient();
+  const thisYear = new Date().getFullYear();
+  const [year, setYear] = useState(thisYear);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -18,8 +63,8 @@ export default function HolidaysPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['holidays'],
-    queryFn: () => api.get('/leave/holidays'),
+    queryKey: ['holidays', year],
+    queryFn: () => api.get('/leave/holidays', { year }),
   });
 
   const create = useMutation({
@@ -45,22 +90,18 @@ export default function HolidaysPage() {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Hata'),
   });
 
-  const sorted = data ? [...data].sort((a, b) =>
+  const sorted = data ? [...data].sort((a: any, b: any) =>
     new Date(a.date).getTime() - new Date(b.date).getTime()
   ) : [];
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="text-brand-600" />
-            {canManage ? 'Resmi Tatil Yönetimi' : 'Resmi Tatiller'}
-          </h1>
-          <p className="text-gray-600 text-sm">
-            İzin hesaplamasında kullanılacak tatil günleri (Belge: Dinamik Takvim)
-          </p>
-        </div>
+        <select className="input w-auto" value={year} onChange={(e) => setYear(+e.target.value)}>
+          {[thisYear - 1, thisYear, thisYear + 1, thisYear + 2].map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
         {canManage && (
           <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
             <Plus size={16} /> Yeni Tatil
@@ -68,15 +109,11 @@ export default function HolidaysPage() {
         )}
       </div>
 
-      {/* Tatiller sabit/yinelenen tarihler olduğundan yıl filtresi yoktur */}
       <div className="card flex items-center">
-        <p className="text-sm text-gray-600">Tanımlı tatil günleri</p>
-        <p className="text-xs text-gray-500 ml-auto">
-          {sorted.length} tatil günü
-        </p>
+        <p className="text-sm text-gray-600">{year} yılı tatil günleri</p>
+        <p className="text-xs text-gray-500 ml-auto">{sorted.length} tatil günü</p>
       </div>
 
-      {/* Yeni Tatil Formu */}
       {canManage && showForm && (
         <form
           onSubmit={(e) => { e.preventDefault(); create.mutate(); }}
@@ -144,7 +181,6 @@ export default function HolidaysPage() {
         </form>
       )}
 
-      {/* Tatil Listesi */}
       <div className="card overflow-x-auto p-0">
         <table className="w-full">
           <thead className="bg-gray-50">
@@ -163,11 +199,7 @@ export default function HolidaysPage() {
               <tr><td colSpan={canManage ? 5 : 4} className="text-center py-8 text-gray-500">Tatil yok</td></tr>
             ) : sorted.map((h: any) => (
               <tr key={h.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-mono">
-                  {new Date(h.date).toLocaleDateString('tr-TR', {
-                    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
-                  })}
-                </td>
+                <td className="px-4 py-3 text-sm font-mono">{fmt(h.date)}</td>
                 <td className="px-4 py-3 text-sm font-medium">{h.name}</td>
                 <td className="px-4 py-3 text-sm">
                   {h.isOfficial ? (
@@ -187,6 +219,8 @@ export default function HolidaysPage() {
                 </td>
                 {canManage && (
                   <td className="px-4 py-3 text-right">
+                    {/* recurring tatiller yıla göre üretilir; gerçek DB kaydı sabit
+                        tarihli, silme her zaman o gerçek kayda uygulanır. */}
                     <button
                       onClick={() => {
                         if (confirm(`"${h.name}" tatilini silmek istediğinize emin misiniz?`)) {
@@ -205,6 +239,40 @@ export default function HolidaysPage() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function UpcomingHolidaysTab() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['holidays-upcoming'],
+    queryFn: () => api.get('/leave/holidays/upcoming'),
+  });
+
+  return (
+    <div className="space-y-2 max-w-lg">
+      {isLoading ? (
+        <p className="text-gray-500 text-sm">Yükleniyor...</p>
+      ) : !data || data.length === 0 ? (
+        <div className="card text-center py-12">
+          <Clock className="mx-auto text-gray-400 mb-2" size={32} />
+          <p className="text-gray-600">Yaklaşan tatil yok</p>
+        </div>
+      ) : (
+        data.map((h: any) => (
+          <div key={h.id} className="card !p-4 flex items-center justify-between">
+            <div>
+              <p className="font-medium text-gray-900">{h.name}</p>
+              <p className="text-sm text-gray-500">{fmt(h.date)}</p>
+            </div>
+            {h.isOfficial ? (
+              <span className="badge bg-red-100 text-red-800">Resmi Tatil</span>
+            ) : (
+              <span className="badge bg-blue-100 text-blue-800">Bilgi</span>
+            )}
+          </div>
+        ))
+      )}
     </div>
   );
 }

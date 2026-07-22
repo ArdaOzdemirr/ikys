@@ -1159,26 +1159,53 @@ export class LeaveService {
   }
 
   /** Tek bir personelin yıllık izin dökümü (Excel'deki "izin detay" sayfası gibi). */
-  async generatePersonYearlyPdf(personnelId: string, year: number): Promise<Buffer> {
+  async generatePersonYearlyPdf(personnelId: string, year: number | null): Promise<Buffer> {
     const p = await this.prisma.personnel.findUnique({
       where: { id: personnelId },
       include: { department: true },
     });
     if (!p) throw new NotFoundException('Personel kaydı bulunamadı');
 
-    const b = await this.yearlyBreakdown(personnelId, p.hireDate, year);
+    let cards: [string, string][];
+    let takenLeaves: Array<{
+      startDate: Date;
+      endDate: Date;
+      totalDays: number;
+      type: string | null;
+      category: { name: string } | null;
+    }>;
 
-    const yearStart = new Date(year, 0, 1);
-    const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
-    const takenLeaves = await this.prisma.leaveRequest.findMany({
-      where: {
-        personnelId,
-        status: LeaveStatus.APPROVED,
-        startDate: { gte: yearStart, lte: yearEnd },
-      },
-      include: { category: true },
-      orderBy: { startDate: 'asc' },
-    });
+    if (year != null) {
+      const b = await this.yearlyBreakdown(personnelId, p.hireDate, year);
+      const yearStart = new Date(year, 0, 1);
+      const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
+      takenLeaves = await this.prisma.leaveRequest.findMany({
+        where: { personnelId, status: LeaveStatus.APPROVED, startDate: { gte: yearStart, lte: yearEnd } },
+        include: { category: true },
+        orderBy: { startDate: 'asc' },
+      });
+      cards = [
+        [`${year} Eklenen`, `${this.fmtDays(b.eklenen)} gün`],
+        ['Yıl Sonu Kalan', `${this.fmtDays(b.yilSonuKalan)} gün`],
+        ['Kalan', `${this.fmtDays(b.kalan)} gün`],
+        ['Ücretsiz İzin', `${this.fmtDays(b.ucretsiz)} gün`],
+        ['Rapor', `${this.fmtDays(b.rapor)} gün`],
+      ];
+    } else {
+      // "Tüm yıllar": kademeli/yıl bazlı kırılım yerine, hiç sıfırlanmayan
+      // kümülatif bakiye ve personelin tüm izin geçmişi gösterilir.
+      const annual = await this.annualLeaveSummary(personnelId, p.hireDate);
+      takenLeaves = await this.prisma.leaveRequest.findMany({
+        where: { personnelId, status: LeaveStatus.APPROVED },
+        include: { category: true },
+        orderBy: { startDate: 'asc' },
+      });
+      cards = [
+        ['Toplam Hak', `${this.fmtDays(annual.totalEntitled)} gün`],
+        ['Kullanılan', `${this.fmtDays(annual.used)} gün`],
+        ['Kalan', `${this.fmtDays(annual.remaining)} gün`],
+      ];
+    }
 
     const typeLabels: Record<string, string> = {
       ANNUAL: 'Yıllık İzin', HALF_DAY: 'Yarım Gün İzin', HOURLY: 'Saatlik İzin',
@@ -1198,7 +1225,10 @@ export class LeaveService {
       doc.registerFont('DejaVu-Bold', path.join(this.fontsDir, 'DejaVuSans-Bold.ttf'));
       doc.font('DejaVu');
 
-      doc.font('DejaVu-Bold').fontSize(16).text(`${year} YILLIK İZİN DÖKÜMÜ`, { align: 'center' });
+      doc.font('DejaVu-Bold').fontSize(16).text(
+        year != null ? `${year} YILLIK İZİN DÖKÜMÜ` : 'TÜM YILLAR İZİN DÖKÜMÜ',
+        { align: 'center' },
+      );
       doc.moveDown(1);
 
       doc.font('DejaVu-Bold').fontSize(12).text(`${p.firstName} ${p.lastName}`);
@@ -1208,13 +1238,6 @@ export class LeaveService {
       doc.text(`İşe Giriş: ${dayjs(p.hireDate).format('DD.MM.YYYY')}`);
       doc.moveDown(1);
 
-      const cards = [
-        [`${year} Eklenen`, `${this.fmtDays(b.eklenen)} gün`],
-        ['Yıl Sonu Kalan', `${this.fmtDays(b.yilSonuKalan)} gün`],
-        ['Kalan', `${this.fmtDays(b.kalan)} gün`],
-        ['Ücretsiz İzin', `${this.fmtDays(b.ucretsiz)} gün`],
-        ['Rapor', `${this.fmtDays(b.rapor)} gün`],
-      ];
       const cardWidth = (doc.page.width - 100) / cards.length;
       const cardY = doc.y;
       cards.forEach(([label, value], i) => {
@@ -1255,7 +1278,7 @@ export class LeaveService {
       drawHeader();
 
       if (takenLeaves.length === 0) {
-        doc.fillColor('gray').text('Bu yıl için kayıtlı izin yok.');
+        doc.fillColor('gray').text(year != null ? 'Bu yıl için kayıtlı izin yok.' : 'Kayıtlı izin yok.');
         doc.fillColor('black');
       }
 

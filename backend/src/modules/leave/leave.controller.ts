@@ -177,17 +177,17 @@ export class LeaveController {
 
   @Get('balance/:personnelId/pdf')
   @Roles(Role.HR, Role.ADMIN)
-  @ApiOperation({ summary: 'Tek bir personelin yıllık izin dökümünü PDF olarak indir' })
+  @ApiOperation({ summary: 'Tek bir personelin yıllık izin dökümünü PDF olarak indir (year=all -> tüm yıllar)' })
   async personBalancePdf(
     @Param('personnelId') personnelId: string,
     @Query('year') year: string | undefined,
     @Res() res: Response,
   ) {
-    const y = year ? +year : new Date().getFullYear();
+    const y = !year ? new Date().getFullYear() : year === 'all' ? null : +year;
     const buffer = await this.service.generatePersonYearlyPdf(personnelId, y);
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="izin-dokumu-${personnelId}-${y}.pdf"`,
+      'Content-Disposition': `attachment; filename="izin-dokumu-${personnelId}-${y ?? 'tum-yillar'}.pdf"`,
     });
     res.send(buffer);
   }

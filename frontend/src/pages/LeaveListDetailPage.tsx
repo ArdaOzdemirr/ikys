@@ -62,7 +62,7 @@ export default function LeaveListDetailPage() {
   });
 
   const downloadYearlyReport = useMutation({
-    mutationFn: () => api.openProtectedFile(`/leave/balance/${personnelId}/pdf?year=${yr || year}`),
+    mutationFn: () => api.openProtectedFile(`/leave/balance/${personnelId}/pdf?year=${yr || 'all'}`),
     onError: (e: any) => toast.error(e.response?.data?.message || 'İndirilemedi'),
   });
 

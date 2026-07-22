@@ -40,7 +40,7 @@ export default function LeaveListDetailPage() {
   const qc = useQueryClient();
   const year = new Date().getFullYear();
   const [status, setStatus] = useState('ALL');
-  const [yr, setYr] = useState('');
+  const [yr, setYr] = useState(String(year));
   const [month, setMonth] = useState('');
   const [showHourly, setShowHourly] = useState(false);
   const [hourlyForm, setHourlyForm] = useState({ date: '', startTime: '', endTime: '', reason: '' });
@@ -49,6 +49,12 @@ export default function LeaveListDetailPage() {
     queryKey: ['leave-list', status, yr],
     queryFn: () => api.get('/leave/list', { status, year: yr || undefined }),
   });
+
+  const { data: balances } = useQuery<any[]>({
+    queryKey: ['leave-balances-all'],
+    queryFn: () => api.get('/leave/balance/all'),
+  });
+  const balance = balances?.find((b) => b.personnelId === personnelId);
 
   const downloadDoc = useMutation({
     mutationFn: (id: string) => api.download(`/leave/requests/${id}/document`, `izin-onay-belgesi-${id}.pdf`),
@@ -109,6 +115,23 @@ export default function LeaveListDetailPage() {
         </div>
       </div>
       {person && <p className="text-sm text-gray-500">{person.department?.name ?? '-'}</p>}
+
+      {balance && (
+        <div className="grid grid-cols-3 gap-4 max-w-lg">
+          <div className="card text-center">
+            <p className="text-2xl font-bold text-gray-900">{balance.totalEntitled}</p>
+            <p className="text-xs text-gray-500 mt-1">Toplam Hak</p>
+          </div>
+          <div className="card text-center">
+            <p className="text-2xl font-bold text-gray-900">{balance.used}</p>
+            <p className="text-xs text-gray-500 mt-1">Kullanılan</p>
+          </div>
+          <div className="card text-center">
+            <p className="text-2xl font-bold text-brand-700">{balance.remaining}</p>
+            <p className="text-xs text-gray-500 mt-1">Kalan</p>
+          </div>
+        </div>
+      )}
 
       {showHourly && (
         <form

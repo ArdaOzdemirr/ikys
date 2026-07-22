@@ -436,6 +436,9 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
   bool _broadcast = false;
   String _priority = 'NORMAL';
   int _threadRefreshKey = 0;
+  // Bir kişiye tek başına "Mesajlaş" ile girilen sohbet — çoklu-alıcı
+  // checkbox seçiminden (_selected) tamamen bağımsız, birbirini etkilemesin.
+  String? _chatWithId;
 
   @override
   void initState() {
@@ -456,13 +459,13 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
   void _snack(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
-  // Gönderim seçenekleri (alıcı/duyuru/önem) aynı kalıyor; tek bir alıcıyla
-  // (ya da yanıt modunda) normal bir sohbet alanı gibi eski mesajlar + mesaj
-  // kutusu gösteriliyor. Birden fazla alıcı / toplu duyuruda eski form kalıyor.
+  // Gönderim seçenekleri (alıcı/duyuru/önem) aynı kalıyor; "Mesajlaş"a basınca
+  // (ya da yanıt modunda) sohbet alanı açılıyor. Checkbox'larla birden fazla
+  // kişi seçip toplu/grup mesajı eski form üzerinden göndermeye devam edilebilir.
   String? get _threadOtherId {
     if (_broadcast) return null;
     if (widget.replyToId != null) return widget.replyToId;
-    return _selected.length == 1 ? _selected.first : null;
+    return _chatWithId;
   }
 
   bool get _chatMode => _threadOtherId != null;
@@ -471,7 +474,12 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
     final title = _chatMode ? _chatTitle.text.trim() : _title.text.trim();
     final body = _chatMode ? _chatText.text.trim() : _body.text.trim();
     if (title.isEmpty) return;
-    if (!_broadcast && widget.replyToNotificationId == null && _selected.isEmpty) return;
+    if (!_broadcast &&
+        widget.replyToNotificationId == null &&
+        _selected.isEmpty &&
+        _chatWithId == null) {
+      return;
+    }
     setState(() => _sending = true);
     try {
       final int n;
@@ -486,7 +494,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
         );
       } else {
         n = await NotificationService.sendMessage(
-          recipientIds: _selected.toList(),
+          recipientIds: _chatMode ? [_threadOtherId!] : _selected.toList(),
           title: title,
           body: body,
           priority: _priority,
@@ -551,7 +559,7 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
               ),
               if (widget.replyToId == null)
                 TextButton(
-                  onPressed: () => setState(() => _selected.clear()),
+                  onPressed: () => setState(() => _chatWithId = null),
                   child: const Text('Değiştir'),
                 ),
             ],
@@ -682,15 +690,29 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
           if (_recipients.isEmpty)
             const Text('Kişi bulunamadı.', style: TextStyle(color: Colors.grey))
           else
-            ...filtered.map((p) => CheckboxListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  value: _selected.contains(p.id),
-                  onChanged: (v) => setState(() {
-                    v == true ? _selected.add(p.id) : _selected.remove(p.id);
-                  }),
-                  title: Text(p.fullName),
-                  subtitle: Text(_sub(p)),
+            ...filtered.map((p) => Row(
+                  children: [
+                    Checkbox(
+                      value: _selected.contains(p.id),
+                      onChanged: (v) => setState(() {
+                        v == true ? _selected.add(p.id) : _selected.remove(p.id);
+                      }),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(p.fullName),
+                          Text(_sub(p), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => _chatWithId = p.id),
+                      child: const Text('Mesajlaş'),
+                    ),
+                  ],
                 )),
         ],
         const SizedBox(height: 16),

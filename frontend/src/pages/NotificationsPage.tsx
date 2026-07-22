@@ -310,16 +310,19 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
   const [body, setBody] = useState('');
   const [chatTitle, setChatTitle] = useState('');
   const [chatText, setChatText] = useState('');
+  // Bir kişiye tek başına "mesajlaş" ile girilen sohbet — çoklu-alıcı
+  // checkbox seçiminden (selected) tamamen bağımsız, birbirini etkilemesin.
+  const [chatWithId, setChatWithId] = useState<string | null>(null);
 
   const { data: recipients } = useQuery<Recipient[]>({
     queryKey: ['notif-recipients'],
     queryFn: () => api.get('/notifications/recipients'),
   });
 
-  // Gönderim seçenekleri (alıcı/duyuru/önem) aynı kalıyor; tek bir alıcıyla
-  // (ya da yanıt modunda) normal bir sohbet alanı gibi eski mesajlar + mesaj
-  // kutusu gösteriliyor. Birden fazla alıcı / toplu duyuruda eski form kalıyor.
-  const chatOtherId = !broadcast ? (replyTo?.id ?? (selected.size === 1 ? [...selected][0] : null)) : null;
+  // Gönderim seçenekleri (alıcı/duyuru/önem) aynı kalıyor; bir kişiyle "Mesajlaş"a
+  // basılınca (ya da yanıt modunda) sohbet alanı açılıyor. Checkbox'larla birden
+  // fazla kişi seçip toplu/grup mesajı eski form üzerinden göndermeye devam edilebilir.
+  const chatOtherId = !broadcast ? (replyTo?.id ?? chatWithId) : null;
   const chatMode = chatOtherId != null;
 
   const send = useMutation({
@@ -413,16 +416,25 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
             ) : (
               <div className="space-y-1 max-h-72 overflow-y-auto">
                 {filtered.map((p) => (
-                  <label key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)}
-                      className="w-4 h-4 accent-brand-600" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{p.firstName} {p.lastName}</p>
-                      <p className="text-xs text-gray-500">
-                        {[p.position, p.department].filter(Boolean).join(' · ') || '-'}
-                      </p>
-                    </div>
-                  </label>
+                  <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
+                    <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)}
+                        className="w-4 h-4 accent-brand-600" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{p.firstName} {p.lastName}</p>
+                        <p className="text-xs text-gray-500">
+                          {[p.position, p.department].filter(Boolean).join(' · ') || '-'}
+                        </p>
+                      </div>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setChatWithId(p.id)}
+                      className="text-xs text-brand-600 hover:underline shrink-0"
+                    >
+                      Mesajlaş
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -438,7 +450,7 @@ function ComposeMessage({ replyTo, onSent }: { replyTo: ReplyTo; onSent: () => v
               </div>
               {!replyTo && (
                 <button
-                  onClick={() => setSelected(new Set())}
+                  onClick={() => setChatWithId(null)}
                   className="text-xs text-gray-400 hover:text-gray-600"
                 >
                   Değiştir

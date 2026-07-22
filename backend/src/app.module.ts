@@ -10,7 +10,6 @@ import { PersonnelModule } from './modules/personnel/personnel.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { LeaveModule } from './modules/leave/leave.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
-import { RecruitmentModule } from './modules/recruitment/recruitment.module';
 import { KvkkModule } from './modules/kvkk/kvkk.module';
 import { CompanyModule } from './modules/company/company.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -32,7 +31,6 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     AttendanceModule,
     LeaveModule,
     PayrollModule,
-    RecruitmentModule,
     KvkkModule,
     NotificationsModule,
   ],

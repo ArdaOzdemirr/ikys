@@ -85,13 +85,20 @@ export default function LeaveCategoriesPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-3 justify-end">
-                    <button onClick={() => setVisibilityFor(c)} title="Kişiye özel görünürlük"
-                      className="text-gray-400 hover:text-brand-600"><Eye size={16} /></button>
-                    <button onClick={() => setEditing(c)} title="Düzenle"
-                      className="text-gray-400 hover:text-brand-600"><Pencil size={16} /></button>
+                    {!c.isSystem && (
+                      <button onClick={() => setVisibilityFor(c)} title="Kişiye özel görünürlük"
+                        className="text-gray-400 hover:text-brand-600"><Eye size={16} /></button>
+                    )}
+                    {!c.isSystem && (
+                      <button onClick={() => setEditing(c)} title="Düzenle"
+                        className="text-gray-400 hover:text-brand-600"><Pencil size={16} /></button>
+                    )}
                     {!c.isSystem && (
                       <button onClick={() => del.mutate(c.id)} title="Sil"
                         className="text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                    )}
+                    {c.isSystem && (
+                      <span className="text-xs text-gray-400">Sistem türü</span>
                     )}
                   </div>
                 </td>

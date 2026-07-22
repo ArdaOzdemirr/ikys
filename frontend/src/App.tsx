@@ -19,10 +19,6 @@ import PayrollPage from './pages/PayrollPage';
 import PayrollManagementPage from './pages/PayrollManagementPage';
 import ExpensesPage from './pages/ExpensesPage';
 import ExpenseApprovalPage from './pages/ExpenseApprovalPage';
-import RecruitmentPage from './pages/RecruitmentPage';
-import CandidateDetailPage from './pages/CandidateDetailPage';
-import JobPostingsPage from './pages/JobPostingsPage';
-import PublicJobsPage from './pages/PublicJobsPage';
 import KvkkLogsPage from './pages/KvkkLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
@@ -44,7 +40,6 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/jobs" element={<PublicJobsPage />} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<Navigate to="/dashboard" />} />
         <Route path="/dashboard" element={<DashboardPage />} />
@@ -65,9 +60,6 @@ export default function App() {
         <Route path="/payroll/management" element={<PayrollManagementPage />} />
         <Route path="/expenses" element={<ExpensesPage />} />
         <Route path="/expenses/approvals" element={<ExpenseApprovalPage />} />
-        <Route path="/recruitment" element={<RecruitmentPage />} />
-        <Route path="/recruitment/postings" element={<JobPostingsPage />} />
-        <Route path="/recruitment/candidates/:id" element={<CandidateDetailPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/kvkk/logs" element={<KvkkLogsPage />} />

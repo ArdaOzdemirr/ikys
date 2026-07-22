@@ -5,8 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import {
   LayoutDashboard, Users, GitBranch, Clock, Calendar, CheckSquare,
-  Wallet, Receipt, Briefcase, Shield, LogOut, Building2, Network,
-  UserCircle, FileSpreadsheet, FilePlus, QrCode, CalendarDays, Bell, ListChecks, Tags,
+  Wallet, Receipt, Shield, LogOut, Building2, Network,
+  UserCircle, FileSpreadsheet, QrCode, CalendarDays, Bell, ListChecks, Tags,
   Menu, X, ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 
@@ -15,6 +15,7 @@ interface NavItem {
   label: string;
   icon: any;
   roles?: string[];
+  requiresPayrollManage?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -31,18 +32,16 @@ const navItems: NavItem[] = [
   { to: '/leave/categories', label: 'İzin Kategorileri', icon: Tags, roles: ['HR', 'ADMIN'] },
   { to: '/leave/holidays', label: 'Resmi Tatiller', icon: CalendarDays },
   { to: '/payroll', label: 'Bordrolarım', icon: Wallet },
-  { to: '/payroll/management', label: 'Bordro Yönetimi', icon: FileSpreadsheet, roles: ['HR', 'ACCOUNTING'] },
+  { to: '/payroll/management', label: 'Bordro Yönetimi', icon: FileSpreadsheet, requiresPayrollManage: true },
   { to: '/expenses', label: 'Masraflarım', icon: Receipt },
   { to: '/expenses/approvals', label: 'Masraf Onayları', icon: CheckSquare, roles: ['HR', 'ACCOUNTING'] },
-  { to: '/recruitment', label: 'İşe Alım', icon: Briefcase, roles: ['HR', 'ADMIN', 'MANAGER'] },
-  { to: '/recruitment/postings', label: 'İş İlanları', icon: FilePlus, roles: ['HR', 'ADMIN'] },
   { to: '/notifications', label: 'Bildirimler', icon: Bell },
   { to: '/profile', label: 'Profilim', icon: UserCircle },
   { to: '/kvkk/logs', label: 'KVKK Logları', icon: Shield, roles: ['ADMIN'] },
 ];
 
 export default function Layout() {
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout, hasRole, canManagePayroll } = useAuth();
   const [collapsed, setCollapsed] = useState(false); // masaüstü: daralt/genişlet
   const [mobileOpen, setMobileOpen] = useState(false); // mobil: aç/kapa (kayar panel)
 
@@ -54,7 +53,10 @@ export default function Layout() {
   });
   const unreadCount = unread?.count ?? 0;
 
-  const visibleItems = navItems.filter((item) => !item.roles || hasRole(...item.roles));
+  const visibleItems = navItems.filter((item) => {
+    if (item.requiresPayrollManage) return canManagePayroll;
+    return !item.roles || hasRole(...item.roles);
+  });
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">

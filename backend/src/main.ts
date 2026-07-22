@@ -49,7 +49,6 @@ async function bootstrap() {
       .addTag('attendance', 'Çalışma saatleri')
       .addTag('leave', 'İzin yönetimi')
       .addTag('payroll', 'Bordro')
-      .addTag('recruitment', 'İşe alım')
       .addTag('kvkk', 'KVKK & Loglama')
       .build();
     const document = SwaggerModule.createDocument(app, config);

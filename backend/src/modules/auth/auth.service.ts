@@ -214,7 +214,25 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: { id: userId, email, role },
+      user: { id: userId, email, role, canManagePayroll: await this.canManagePayroll(userId, role) },
     };
+  }
+
+  /**
+   * Bordro/maaş yönetimi: İK ve hiyerarşinin en tepesindeki (yöneticisi
+   * olmayan) admin yapabilir. Diğer ADMIN'ler (örn. Savaş) sadece kendi
+   * bordrolarını görür. Frontend'de menü/sayfa görünürlüğü için kullanılır;
+   * gerçek yetki kontrolü yine backend'de (payroll.controller.ts) yapılır.
+   */
+  private async canManagePayroll(userId: string, role: string): Promise<boolean> {
+    if (role === 'HR' || role === 'ACCOUNTING') return true;
+    if (role === 'ADMIN') {
+      const p = await this.prisma.personnel.findUnique({
+        where: { userId },
+        select: { managerId: true },
+      });
+      return !!p && p.managerId === null;
+    }
+    return false;
   }
 }

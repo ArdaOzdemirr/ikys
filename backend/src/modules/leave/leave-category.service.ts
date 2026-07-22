@@ -10,15 +10,52 @@ import {
  * - Yeni kategori açma, düzenleme, pasifleştirme
  * - Kategori görünürlüğünü kişiye özel açma/gizleme
  */
+// Sistemin yerleşik (enum tabanlı) izin türleri: gerçek talepler bugün hâlâ
+// bunlar üzerinden çalışıyor (dinamik kategori tablosu boş). "İzin
+// Kategorileri" sayfasında görünsünler diye salt-okunur satırlar olarak
+// gösteriliyor — düzenleme/silme yapılamaz, gerçek DB kaydı değiller.
+const SYSTEM_LEAVE_TYPES: Array<{
+  code: string;
+  name: string;
+  isPaid: boolean;
+  affectsAnnualBalance: boolean;
+}> = [
+  { code: 'ANNUAL', name: 'Yıllık İzin', isPaid: true, affectsAnnualBalance: true },
+  { code: 'HALF_DAY', name: 'Yarım Gün İzin', isPaid: true, affectsAnnualBalance: true },
+  { code: 'HOURLY', name: 'Saatlik İzin', isPaid: true, affectsAnnualBalance: false },
+  { code: 'EXCUSE', name: 'Mazeret İzni', isPaid: true, affectsAnnualBalance: false },
+  { code: 'SICK', name: 'Sağlık Raporu', isPaid: true, affectsAnnualBalance: false },
+  { code: 'MATERNITY', name: 'Doğum İzni', isPaid: true, affectsAnnualBalance: false },
+  { code: 'PATERNITY', name: 'Babalık İzni', isPaid: true, affectsAnnualBalance: false },
+  { code: 'MARRIAGE', name: 'Evlilik İzni', isPaid: true, affectsAnnualBalance: false },
+  { code: 'BEREAVEMENT', name: 'Vefat İzni', isPaid: true, affectsAnnualBalance: false },
+  { code: 'UNPAID', name: 'Ücretsiz İzin', isPaid: false, affectsAnnualBalance: false },
+];
+
 @Injectable()
 export class LeaveCategoryService {
   constructor(private prisma: PrismaService) {}
 
-  list() {
-    return this.prisma.leaveCategory.findMany({
+  async list() {
+    const real = await this.prisma.leaveCategory.findMany({
       orderBy: [{ isSystem: 'desc' }, { name: 'asc' }],
       include: { _count: { select: { requests: true, accesses: true } } },
     });
+    const realCodes = new Set(real.map((c) => c.code));
+    const synthetic = SYSTEM_LEAVE_TYPES.filter((t) => !realCodes.has(t.code)).map((t) => ({
+      id: `system:${t.code}`,
+      code: t.code,
+      name: t.name,
+      description: null,
+      isPaid: t.isPaid,
+      affectsAnnualBalance: t.affectsAnnualBalance,
+      defaultVisible: true,
+      isActive: true,
+      isSystem: true,
+      readOnly: true,
+      _count: { requests: 0, accesses: 0 },
+    }));
+    return [...synthetic, ...real];
   }
 
   async create(dto: CreateLeaveCategoryDto, creatorPersonnelId?: string) {

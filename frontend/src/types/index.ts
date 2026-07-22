@@ -4,6 +4,9 @@ export interface User {
   id: string;
   email: string;
   role: Role;
+  // Bordro/maaş yönetimi yetkisi: İK ve hiyerarşinin en tepesindeki (yöneticisi
+  // olmayan) admin için true. Diğer ADMIN'ler için false (sadece kendi bordrosu).
+  canManagePayroll?: boolean;
 }
 
 export interface AuthResponse {

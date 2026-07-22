@@ -10,7 +10,7 @@ import PersonnelEditModal from '../components/PersonnelEditModal';
 
 export default function PersonnelDetailPage() {
   const { id } = useParams();
-  const { hasRole } = useAuth();
+  const { hasRole, canManagePayroll } = useAuth();
   const [showSalary, setShowSalary] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -28,7 +28,7 @@ export default function PersonnelDetailPage() {
     ? p.tcKimlikNo
     : `${p.tcKimlikNo?.slice(0, 3)}******${p.tcKimlikNo?.slice(-2)}`;
 
-  const canSeeSalary = hasRole('ADMIN', 'HR', 'ACCOUNTING');
+  const canSeeSalary = canManagePayroll;
   const canEdit = hasRole('ADMIN', 'HR');
 
   return (

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Calendar, Clock, TrendingUp } from 'lucide-react';
+import { Users, Calendar, Clock } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -29,12 +29,6 @@ export default function DashboardPage() {
   const { data: myLeaves } = useQuery({
     queryKey: ['leave-me'],
     queryFn: () => api.get('/leave/requests/me'),
-  });
-
-  const { data: kvkkStats } = useQuery({
-    queryKey: ['kvkk-stats'],
-    queryFn: () => api.get('/kvkk/stats'),
-    enabled: hasRole('ADMIN'),
   });
 
   // Personel istatistikleri
@@ -88,14 +82,6 @@ export default function DashboardPage() {
           icon={Clock}
           color="bg-orange-500"
         />
-        {hasRole('ADMIN') && (
-          <StatCard
-            label="Son 24h Aktivite"
-            value={kvkkStats?.last24hActions ?? 0}
-            icon={TrendingUp}
-            color="bg-purple-500"
-          />
-        )}
       </div>
 
       {/* Charts */}

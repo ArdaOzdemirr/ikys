@@ -3,6 +3,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -45,18 +46,43 @@ export class PayrollController {
     return personnel;
   }
 
+  /**
+   * Bordro/maaş yönetimi: İK ve hiyerarşinin en tepesindeki (yöneticisi
+   * olmayan) admin yapabilir. Diğer ADMIN'ler (örn. Savaş) sadece kendi
+   * bordrolarını görür, başkasınınkini yönetemez.
+   */
+  private async assertPayrollManager(userId: string, role: string) {
+    if (role === Role.HR || role === Role.ACCOUNTING) return;
+    if (role === Role.ADMIN) {
+      const p = await this.prisma.personnel.findUnique({
+        where: { userId },
+        select: { managerId: true },
+      });
+      if (p && p.managerId === null) return;
+    }
+    throw new ForbiddenException('Bu işlem için yetkiniz yok');
+  }
+
   // === Maaş Konfigürasyonu ===
   @Post('salary/:personnelId')
-  @Roles(Role.HR, Role.ACCOUNTING)
-  setSalary(@Param('personnelId') personnelId: string, @Body() dto: SetSalaryDto) {
+  async setSalary(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+    @Param('personnelId') personnelId: string,
+    @Body() dto: SetSalaryDto,
+  ) {
+    await this.assertPayrollManager(userId, role);
     return this.service.setSalary(personnelId, dto);
   }
 
   // === Bordro ===
   @Get('personnel')
-  @Roles(Role.HR, Role.ACCOUNTING)
   @ApiOperation({ summary: 'Aktif personel + maaş bilgisi (bordro ekranı için)' })
-  payrollPersonnel() {
+  async payrollPersonnel(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    await this.assertPayrollManager(userId, role);
     return this.prisma.personnel.findMany({
       where: { status: 'ACTIVE' },
       select: {
@@ -72,9 +98,13 @@ export class PayrollController {
   }
 
   @Post('generate')
-  @Roles(Role.HR, Role.ACCOUNTING)
   @ApiOperation({ summary: 'Aylık bordro oluştur (Belge: FR-05)' })
-  generate(@Body() dto: GeneratePayrollDto) {
+  async generate(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+    @Body() dto: GeneratePayrollDto,
+  ) {
+    await this.assertPayrollManager(userId, role);
     return this.service.generatePayroll(dto);
   }
 
@@ -85,8 +115,24 @@ export class PayrollController {
   }
 
   @Get(':id/pdf')
-  @ApiOperation({ summary: 'Bordro PDF indir' })
-  async pdf(@Param('id') id: string, @Res() res: Response) {
+  @ApiOperation({ summary: 'Bordro PDF indir (sadece sahibi ya da bordro yöneticisi)' })
+  async pdf(
+    @Param('id') id: string,
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: string,
+    @Res() res: Response,
+  ) {
+    const payroll = await this.prisma.payroll.findUnique({
+      where: { id },
+      select: { personnelId: true },
+    });
+    if (!payroll) throw new NotFoundException('Bordro bulunamadı');
+
+    const personnel = await this.requirePersonnel(userId);
+    if (payroll.personnelId !== personnel.id) {
+      await this.assertPayrollManager(userId, role);
+    }
+
     const buffer = await this.service.generatePdf(id);
     res.set({
       'Content-Type': 'application/pdf',

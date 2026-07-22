@@ -9,6 +9,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (...roles: string[]) => boolean;
+  canManagePayroll: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,7 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, logout, isAuthenticated: !!user, hasRole }}
+      value={{
+        user, loading, login, logout, isAuthenticated: !!user, hasRole,
+        canManagePayroll: !!user?.canManagePayroll,
+      }}
     >
       {children}
     </AuthContext.Provider>

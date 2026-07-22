@@ -8,7 +8,7 @@ import { Play, Wallet, X } from 'lucide-react';
 const MONTHS = ['', 'Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 
 export default function PayrollManagementPage() {
-  const { hasRole } = useAuth();
+  const { canManagePayroll } = useAuth();
   const qc = useQueryClient();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -61,7 +61,7 @@ export default function PayrollManagementPage() {
     qc.invalidateQueries({ queryKey: ['payrolls-me'] });
   };
 
-  if (!hasRole('HR', 'ACCOUNTING')) {
+  if (!canManagePayroll) {
     return <div className="p-8 text-center"><p className="text-gray-600">Bu sayfaya erişim yetkiniz yok.</p></div>;
   }
 

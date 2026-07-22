@@ -13,11 +13,20 @@ import {
   Role,
 } from '@prisma/client';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
 import { CreateLeaveRequestDto, ApproveLeaveDto, CreateHourlyLeaveDto } from './leave.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { cumulativeAnnualLeaveEntitlement } from './leave-entitlement.util';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// Sunucu (Railway) UTC'de çalışıyor; PDF'lerdeki "oluşturulma tarihi" gibi
+// anlık zaman damgaları Türkiye saatine göre gösterilmeli.
+const TZ = 'Europe/Istanbul';
 
 @Injectable()
 export class LeaveService {
@@ -953,8 +962,18 @@ export class LeaveService {
     const anniversaryLast = new Date(hireDate);
     anniversaryLast.setFullYear(year - 1);
 
-    const entitledThis = cumulativeAnnualLeaveEntitlement(hireDate, anniversaryThis);
-    const entitledLast = cumulativeAnnualLeaveEntitlement(hireDate, anniversaryLast);
+    // Bu yılın yıl dönümü henüz gelmediyse (örn. ilk yılını dolduran bir
+    // personel için rapor "bugün"den önce üretiliyorsa) o hakedişi henüz
+    // vermeyelim — aksi halde henüz doğmamış bir hak erkenden eklenmiş olur.
+    const now = new Date();
+    const entitledThis = cumulativeAnnualLeaveEntitlement(
+      hireDate,
+      anniversaryThis > now ? now : anniversaryThis,
+    );
+    const entitledLast = cumulativeAnnualLeaveEntitlement(
+      hireDate,
+      anniversaryLast > now ? now : anniversaryLast,
+    );
     const eklenen = entitledThis - entitledLast;
 
     const yearStart = new Date(year, 0, 1);
@@ -1072,7 +1091,7 @@ export class LeaveService {
 
       doc.font('DejaVu-Bold').fontSize(15).text(`${year} YILLIK İZİN TABLOSU`, { align: 'center' });
       doc.font('DejaVu').fontSize(8).fillColor('gray').text(
-        `Oluşturulma tarihi: ${dayjs().format('DD.MM.YYYY HH:mm')}`,
+        `Oluşturulma tarihi: ${dayjs().tz(TZ).format('DD.MM.YYYY HH:mm')}`,
         { align: 'center' },
       );
       doc.fillColor('black');

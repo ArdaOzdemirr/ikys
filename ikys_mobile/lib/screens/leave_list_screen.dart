@@ -82,8 +82,10 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
                     onSelected: _viewPdf,
                     itemBuilder: (context) {
                       final thisYear = DateTime.now().year;
+                      // Sirketin Excel'den aktarilan izin verisi 2024'ten basliyor.
+                      const earliestLeaveYear = 2024;
                       return List.generate(
-                        4,
+                        thisYear - earliestLeaveYear + 1,
                         (i) => PopupMenuItem(
                           value: thisYear - i,
                           child: Text('${thisYear - i} yılı'),

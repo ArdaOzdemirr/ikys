@@ -287,7 +287,8 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
                   hint: const Text('Tüm yıllar'),
                   items: [
                     const DropdownMenuItem<int?>(value: null, child: Text('Tüm yıllar')),
-                    ...List.generate(3, (i) => DateTime.now().year - i).map(
+                    // Sirketin Excel'den aktarilan izin verisi 2024'ten basliyor.
+                    ...List.generate(DateTime.now().year - 2024 + 1, (i) => DateTime.now().year - i).map(
                       (y) => DropdownMenuItem<int?>(value: y, child: Text('$y')),
                     ),
                   ],

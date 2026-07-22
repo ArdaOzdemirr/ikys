@@ -20,6 +20,7 @@ import * as path from 'path';
 import { CreateLeaveRequestDto, ApproveLeaveDto, CreateHourlyLeaveDto } from './leave.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { cumulativeAnnualLeaveEntitlement } from './leave-entitlement.util';
+import { getHistoricalOverride } from './leave-historical-overrides.util';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -896,8 +897,10 @@ export class LeaveService {
    * iznini görebilsin, diğerleri sadece kendi iznini görsün").
    */
   async allAnnualBalances() {
+    // İK ve hiyerarşinin en tepesindeki (yöneticisi olmayan) admin, normal
+    // izin sürecinin parçası sayılmıyor — bakiye listelerinde görünmesin.
     const personnel = await this.prisma.personnel.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', managerId: { not: null }, user: { role: { not: Role.HR } } },
       select: {
         id: true,
         firstName: true,
@@ -956,7 +959,13 @@ export class LeaveService {
     personnelId: string,
     hireDate: Date,
     year: number,
+    employeeNo?: string,
   ) {
+    if (employeeNo) {
+      const override = getHistoricalOverride(employeeNo, year);
+      if (override) return override;
+    }
+
     const anniversaryThis = new Date(hireDate);
     anniversaryThis.setFullYear(year);
     const anniversaryLast = new Date(hireDate);
@@ -1061,11 +1070,15 @@ export class LeaveService {
   async generateYearlyBulkPdf(year: number): Promise<Buffer> {
     // İK ve hiyerarşinin en tepesindeki (yöneticisi olmayan) admin, bu raporun
     // takip ettiği "normal" izin süreci dışında sayılır — listeye girmesin.
+    // Henüz o yılın sonunda işe girmemiş personel de (örn. Emir, 2024/2025
+    // raporlarında) listede yer almasın.
+    const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
     const personnel = await this.prisma.personnel.findMany({
       where: {
         status: 'ACTIVE',
         managerId: { not: null },
         user: { role: { not: Role.HR } },
+        hireDate: { lte: yearEnd },
       },
       select: { id: true, firstName: true, lastName: true, employeeNo: true, hireDate: true },
       orderBy: [{ firstName: 'asc' }],
@@ -1074,7 +1087,7 @@ export class LeaveService {
     const rows = await Promise.all(
       personnel.map(async (p) => ({
         ...p,
-        b: await this.yearlyBreakdown(p.id, p.hireDate, year),
+        b: await this.yearlyBreakdown(p.id, p.hireDate, year, p.employeeNo),
       })),
     );
 
@@ -1176,7 +1189,7 @@ export class LeaveService {
     }>;
 
     if (year != null) {
-      const b = await this.yearlyBreakdown(personnelId, p.hireDate, year);
+      const b = await this.yearlyBreakdown(personnelId, p.hireDate, year, p.employeeNo);
       const yearStart = new Date(year, 0, 1);
       const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
       takenLeaves = await this.prisma.leaveRequest.findMany({
@@ -1402,7 +1415,14 @@ export class LeaveService {
   async leaveListPersonnel(personnelId: string, role: string) {
     const scope = await this.leaveListScope(personnelId, role);
     return this.prisma.personnel.findMany({
-      where: { status: 'ACTIVE', ...(scope ? { id: { in: scope } } : {}) },
+      where: {
+        status: 'ACTIVE',
+        // İK ve hiyerarşinin en tepesindeki (yöneticisi olmayan) admin,
+        // normal izin sürecinin parçası sayılmıyor — listede görünmesin.
+        managerId: { not: null },
+        user: { role: { not: Role.HR } },
+        ...(scope ? { id: { in: scope } } : {}),
+      },
       select: {
         id: true,
         firstName: true,

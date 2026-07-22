@@ -186,7 +186,8 @@ export default function LeaveListDetailPage() {
         </select>
         <select className="input max-w-[140px]" value={yr} onChange={(e) => setYr(e.target.value)}>
           <option value="">Tüm yıllar</option>
-          {[year, year - 1, year - 2].map((y) => (
+          {/* Şirketin Excel'den aktarılan izin verisi 2024'ten başlıyor. */}
+          {Array.from({ length: year - 2024 + 1 }, (_, i) => year - i).map((y) => (
             <option key={y} value={y}>{y}</option>
           ))}
         </select>

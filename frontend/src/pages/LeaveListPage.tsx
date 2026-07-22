@@ -19,6 +19,10 @@ interface BalanceRow {
   remaining: number;
 }
 
+// Şirketin Excel'den aktarılan izin verisi 2024'ten başlıyor; daha eski
+// yılların listede görünmesine gerek yok.
+const EARLIEST_LEAVE_YEAR = 2024;
+
 /** HR/Muhasebe/Admin/Yönetici: personel seç, sonra o kişinin izin geçmişine gir. */
 export default function LeaveListPage() {
   const navigate = useNavigate();
@@ -59,7 +63,7 @@ export default function LeaveListPage() {
               value={year}
               onChange={(e) => setYear(+e.target.value)}
             >
-              {[thisYear, thisYear - 1, thisYear - 2, thisYear - 3].map((y) => (
+              {Array.from({ length: thisYear - EARLIEST_LEAVE_YEAR + 1 }, (_, i) => thisYear - i).map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>

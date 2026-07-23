@@ -87,7 +87,7 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
       .where((r) =>
           r.personnelId == widget.personnel.id && (_month == null || r.startDate.month == _month))
       .toList()
-    ..sort((a, b) => a.startDate.compareTo(b.startDate));
+    ..sort((a, b) => b.startDate.compareTo(a.startDate));
 
   Future<void> _pickHourlyDate() async {
     final picked = await showDatePicker(

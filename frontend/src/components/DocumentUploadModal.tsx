@@ -45,17 +45,12 @@ export default function DocumentUploadModal({ open, onClose, personnelId, person
       const formData = new FormData();
       formData.append('file', file);
       formData.append('type', docType);
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(`/api/v1/documents/upload/${personnelId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Yükleme başarısız');
-      }
-      return res.json();
+      // Not: düz fetch() ile göreli bir yol (/api/v1/...) kullanmak, prod'da
+      // frontend ile backend farklı origin'lerde olduğundan yanlış sunucuya
+      // (frontend'in kendi statik sunucusuna) gidiyordu — o da index.html
+      // döndürüp "Unexpected token '<'" JSON hatasına yol açıyordu. api.post
+      // zaten doğru (mutlak) base URL'i ve Authorization header'ını kullanıyor.
+      return api.post(`/documents/upload/${personnelId}`, formData);
     },
     onSuccess: () => {
       toast.success('Belge yüklendi');
@@ -64,7 +59,7 @@ export default function DocumentUploadModal({ open, onClose, personnelId, person
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
-    onError: (e: any) => toast.error(e.message || 'Hata'),
+    onError: (e: any) => toast.error(e.response?.data?.message || e.message || 'Hata'),
   });
 
   const remove = useMutation({

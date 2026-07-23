@@ -79,7 +79,7 @@ export default function LeaveListDetailPage() {
 
   const mine = (rows ?? [])
     .filter((r) => r.personnelId === personnelId && (!month || new Date(r.startDate).getMonth() + 1 === +month))
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   const person = mine[0]?.personnel;
 
   return (

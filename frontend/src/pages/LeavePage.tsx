@@ -258,7 +258,7 @@ export default function LeavePage() {
                   if (month && +r.startDate.slice(5, 7) !== +month) return false;
                   return true;
                 })
-                .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+                .sort((a: any, b: any) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
               if (filtered.length === 0) {
                 return <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">Talep yok</td></tr>;
               }

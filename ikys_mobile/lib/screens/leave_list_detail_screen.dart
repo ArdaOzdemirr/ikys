@@ -70,9 +70,10 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
     setState(() => _openingReport = true);
     try {
       final yearParam = _year?.toString() ?? 'all';
+      final nameSlug = widget.personnel.fullName.replaceAll(' ', '-');
       await ApiClient.instance.openFileUrl(
         '/leave/balance/${widget.personnel.id}/pdf?year=$yearParam',
-        fileName: 'izin-dokumu-${widget.personnel.id}-$yearParam.pdf',
+        fileName: 'izin-dokumu-$nameSlug-$yearParam.pdf',
       );
     } catch (e) {
       if (mounted) {
@@ -408,7 +409,7 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
               child: TextButton(
                 onPressed: () => ApiClient.instance.openFileUrl(
                   '/leave/requests/${r.id}/document',
-                  fileName: 'izin-onay-belgesi-${r.id}.pdf',
+                  fileName: 'izin-onay-belgesi-${DateFormat('yyyy-MM-dd').format(r.startDate)}.pdf',
                 ),
                 style: TextButton.styleFrom(padding: EdgeInsets.zero),
                 child: const Text('Belge Görüntüle', style: TextStyle(color: Color(0xFF2563EB))),

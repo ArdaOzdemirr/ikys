@@ -351,7 +351,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
               child: TextButton(
                 onPressed: () => ApiClient.instance.openFileUrl(
                   '/leave/requests/${r.id}/document',
-                  fileName: 'izin-onay-belgesi-${r.id}.pdf',
+                  fileName: 'izin-onay-belgesi-${DateFormat('yyyy-MM-dd').format(r.startDate)}.pdf',
                 ),
                 style: TextButton.styleFrom(padding: EdgeInsets.zero),
                 child: const Text('Belge Görüntüle', style: TextStyle(color: Color(0xFF2563EB))),

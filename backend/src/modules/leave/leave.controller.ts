@@ -8,6 +8,17 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../config/prisma.service';
 
+/** İnsan tarafından okunabilir, dosya adı için güvenli hale getirir (Türkçe karakterleri sadeleştirir). */
+function slugifyFilenamePart(s: string): string {
+  return s
+    .replace(/ı/g, 'i').replace(/İ/g, 'I').replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+    .replace(/ü/g, 'u').replace(/Ü/g, 'U').replace(/ş/g, 's').replace(/Ş/g, 'S')
+    .replace(/ö/g, 'o').replace(/Ö/g, 'O').replace(/ç/g, 'c').replace(/Ç/g, 'C')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 @ApiTags('leave')
 @ApiBearerAuth()
 @Controller('leave')
@@ -74,7 +85,10 @@ export class LeaveController {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
     if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
 
-    const req = await this.prisma.leaveRequest.findUnique({ where: { id } });
+    const req = await this.prisma.leaveRequest.findUnique({
+      where: { id },
+      include: { personnel: true },
+    });
     if (!req) throw new NotFoundException('İzin talebi bulunamadı');
 
     const isOwner = req.personnelId === personnel.id;
@@ -84,9 +98,11 @@ export class LeaveController {
     }
 
     const buffer = await this.service.generateApprovalPdf(id);
+    const name = slugifyFilenamePart(`${req.personnel.firstName} ${req.personnel.lastName}`);
+    const start = req.startDate.toISOString().slice(0, 10);
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="izin-onay-belgesi-${id}.pdf"`,
+      'Content-Disposition': `attachment; filename="izin-onay-belgesi-${name}-${start}.pdf"`,
     });
     res.send(buffer);
   }
@@ -184,10 +200,15 @@ export class LeaveController {
     @Res() res: Response,
   ) {
     const y = !year ? new Date().getFullYear() : year === 'all' ? null : +year;
-    const buffer = await this.service.generatePersonYearlyPdf(personnelId, y);
+    const [buffer, personnel] = await Promise.all([
+      this.service.generatePersonYearlyPdf(personnelId, y),
+      this.prisma.personnel.findUnique({ where: { id: personnelId } }),
+    ]);
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+    const name = slugifyFilenamePart(`${personnel.firstName} ${personnel.lastName}`);
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="izin-dokumu-${personnelId}-${y ?? 'tum-yillar'}.pdf"`,
+      'Content-Disposition': `attachment; filename="izin-dokumu-${name}-${y ?? 'tum-yillar'}.pdf"`,
     });
     res.send(buffer);
   }

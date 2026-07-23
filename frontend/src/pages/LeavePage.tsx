@@ -8,7 +8,6 @@ const LEAVE_TYPES = [
   { value: 'ANNUAL', label: 'Yıllık İzin' },
   { value: 'HALF_DAY_AM', label: 'Öğleden Önce İzni (09:00-13:30)' },
   { value: 'HALF_DAY_PM', label: 'Öğleden Sonra İzni (13:30-18:00)' },
-  { value: 'HOURLY', label: 'Saatlik' },
   { value: 'EXCUSE', label: 'Mazeret' },
   { value: 'SICK', label: 'Sağlık Raporu' },
   { value: 'MATERNITY', label: 'Doğum İzni' },

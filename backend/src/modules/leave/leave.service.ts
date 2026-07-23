@@ -1650,14 +1650,30 @@ export class LeaveService {
   }
 
   /**
-   * İzin gün sayısı: takvim günü, başlangıç VE bitiş tarihi dahil (standart
-   * İK pratiği — örn. 26.06 -> 28.06 = 3 gün: 26, 27, 28).
-   * (Hafta sonu/resmi tatil ayrımı yapılmaz — kullanıcı tercihi.)
+   * İzin gün sayısı: başlangıç VE bitiş tarihi dahil, aralıktaki her gün için
+   * hafta sonu (cumartesi/pazar) ve resmi tatiller hariç tutularak sayılır.
+   * Örn. 23.07 (Per) -> 27.07 (Pzt) = 4 iş günü (25-26 hafta sonu hariç).
    */
   private async calculateBusinessDays(start: Date, end: Date): Promise<number> {
     const s = dayjs(start).startOf('day');
     const e = dayjs(end).startOf('day');
-    const diff = e.diff(s, 'day') + 1;
-    return diff <= 0 ? 1 : diff;
+
+    const years = new Set<number>();
+    for (let y = s.year(); y <= e.year(); y++) years.add(y);
+    const holidayLists = await Promise.all([...years].map((y) => this.listHolidays(y)));
+    const holidaySet = new Set(
+      holidayLists.flat().map((h) => dayjs(h.date).format('YYYY-MM-DD')),
+    );
+
+    let count = 0;
+    let cur = s;
+    while (!cur.isAfter(e)) {
+      const dow = cur.day(); // 0=Pazar .. 6=Cumartesi
+      if (dow !== 0 && dow !== 6 && !holidaySet.has(cur.format('YYYY-MM-DD'))) {
+        count++;
+      }
+      cur = cur.add(1, 'day');
+    }
+    return count;
   }
 }

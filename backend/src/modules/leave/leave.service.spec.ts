@@ -38,6 +38,9 @@ describe('LeaveService - ilk yıl izin kuralı', () => {
         // annualLeaveSummary(): kümülatif hakediş - tüm yılların usedDays toplamı
         findMany: jest.fn().mockResolvedValue(usedDays > 0 ? [{ usedDays }] : []),
       },
+      holiday: {
+        findMany: jest.fn().mockResolvedValue([]), // calculateBusinessDays: resmi tatil yok
+      },
       $transaction: jest.fn(async (cb: any) =>
         cb({
           leaveRequest: { create: jest.fn().mockResolvedValue({ id: 'req1' }) },

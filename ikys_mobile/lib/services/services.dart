@@ -369,6 +369,24 @@ class DocumentService {
     final res = await ApiClient.instance.dio.get('/documents/personnel/$personnelId');
     return (res.data as List).map((e) => PersonnelDocument.fromJson(e)).toList();
   }
+
+  /// Belge yükler (yalnızca HR/Admin — bkz. backend @Roles).
+  static Future<void> upload({
+    required String personnelId,
+    required String filePath,
+    required String fileName,
+    required String type,
+  }) async {
+    final form = FormData.fromMap({
+      'type': type,
+      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+    });
+    await ApiClient.instance.dio.post('/documents/upload/$personnelId', data: form);
+  }
+
+  static Future<void> remove(String documentId) async {
+    await ApiClient.instance.dio.delete('/documents/$documentId');
+  }
 }
 
 class ExpenseService {

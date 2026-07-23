@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
 import '../providers/auth_provider.dart';
 import '../models/models.dart';
 import '../services/services.dart';
@@ -14,6 +15,18 @@ const _roleLabel = {
   'HR': 'İnsan Kaynakları',
   'ACCOUNTING': 'Muhasebe',
   'ADMIN': 'Yönetici (Admin)',
+};
+
+const _documentTypes = {
+  'diploma': 'Diploma',
+  'kimlik': 'Kimlik',
+  'ikametgah': 'İkametgah',
+  'sozlesme': 'İş Sözleşmesi',
+  'sgk': 'SGK Belgesi',
+  'saglik_raporu': 'Sağlık Raporu',
+  'cv': 'CV',
+  'fotograf': 'Vesikalık',
+  'diger': 'Diğer',
 };
 
 class ProfileScreen extends StatefulWidget {
@@ -69,6 +82,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _uploadDocument() async {
+    if (_profile == null) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp'],
+    );
+    if (result == null || result.files.isEmpty || result.files.first.path == null) return;
+    final picked = result.files.first;
+
+    if (!mounted) return;
+    String type = 'diploma';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setSt) => AlertDialog(
+          title: const Text('Belge Türü'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(picked.name, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 12),
+              DropdownButton<String>(
+                value: type,
+                isExpanded: true,
+                items: _documentTypes.entries
+                    .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                    .toList(),
+                onChanged: (v) => setSt(() => type = v ?? type),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Vazgeç')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Yükle')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await DocumentService.upload(
+        personnelId: _profile!.id,
+        filePath: picked.path!,
+        fileName: picked.name,
+        type: type,
+      );
+      _snack('Belge yüklendi');
+      _load();
+    } catch (e) {
+      _snack(ApiClient.errorMessage(e, 'Belge yüklenemedi'));
+    }
+  }
+
+  Future<void> _deleteDocument(PersonnelDocument d) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Belgeyi Sil'),
+        content: Text('"${d.fileName}" belgesini silmek istediğinize emin misiniz?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Vazgeç')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Sil')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await DocumentService.remove(d.id);
+      _snack('Belge silindi');
+      _load();
+    } catch (e) {
+      _snack(ApiClient.errorMessage(e, 'Silinemedi'));
+    }
+  }
+
   Future<void> _changePassword() async {
     final ok = await showModalBottomSheet<bool>(
       context: context,
@@ -89,6 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .substring(0, 1)
         .toUpperCase();
     final role = _profile?.role ?? user?.role;
+    final canManageDocs = auth.hasRole(['HR', 'ADMIN']);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -174,12 +265,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _section('Belgelerim'),
-                TextButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PayrollScreen()),
-                  ),
-                  icon: const Icon(Icons.receipt_long_outlined, size: 16),
-                  label: const Text('Bordrolarım'),
+                Row(
+                  children: [
+                    if (canManageDocs)
+                      TextButton.icon(
+                        onPressed: _uploadDocument,
+                        icon: const Icon(Icons.upload_file_outlined, size: 16),
+                        label: const Text('Ekle'),
+                      ),
+                    TextButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const PayrollScreen()),
+                      ),
+                      icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                      label: const Text('Bordrolarım'),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -189,7 +290,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Text('Henüz belge yüklenmemiş.', style: TextStyle(color: Colors.grey)),
               )
             else
-              ..._documents.map(_documentRow),
+              ..._documents.map((d) => _documentRow(d, canManageDocs)),
           ],
 
           const SizedBox(height: 24),
@@ -226,7 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
       );
 
-  Widget _documentRow(PersonnelDocument d) {
+  Widget _documentRow(PersonnelDocument d, bool canManage) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: const BoxDecoration(
@@ -245,6 +346,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             tooltip: 'Görüntüle',
             onPressed: () => ApiClient.instance.openFileUrl(d.fileUrl, fileName: d.fileName),
           ),
+          if (canManage)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+              tooltip: 'Sil',
+              onPressed: () => _deleteDocument(d),
+            ),
         ],
       ),
     );

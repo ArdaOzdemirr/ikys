@@ -45,7 +45,7 @@ export default function LeaveListPage() {
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(thisYear);
   const downloadPdf = useMutation({
-    mutationFn: () => api.openProtectedFile(`/leave/balance/all/pdf?year=${year}`),
+    mutationFn: () => api.download(`/leave/balance/all/pdf?year=${year}`, `izin-tablosu-${year}.pdf`),
     onError: (e: any) => toast.error(e.response?.data?.message || 'Açılamadı'),
   });
 

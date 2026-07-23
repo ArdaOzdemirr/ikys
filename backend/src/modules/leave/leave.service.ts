@@ -1650,14 +1650,14 @@ export class LeaveService {
   }
 
   /**
-   * İzin gün sayısı: takvim günü, BİTİŞ tarihi hariç (dönüş günü sayılmaz).
-   * Örn. 26.06 -> 28.06 = 2 gün (26 ve 27). Aynı gün seçilirse en az 1 gün.
+   * İzin gün sayısı: takvim günü, başlangıç VE bitiş tarihi dahil (standart
+   * İK pratiği — örn. 26.06 -> 28.06 = 3 gün: 26, 27, 28).
    * (Hafta sonu/resmi tatil ayrımı yapılmaz — kullanıcı tercihi.)
    */
   private async calculateBusinessDays(start: Date, end: Date): Promise<number> {
     const s = dayjs(start).startOf('day');
     const e = dayjs(end).startOf('day');
-    const diff = e.diff(s, 'day');
+    const diff = e.diff(s, 'day') + 1;
     return diff <= 0 ? 1 : diff;
   }
 }

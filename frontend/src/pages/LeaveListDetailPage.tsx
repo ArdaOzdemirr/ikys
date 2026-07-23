@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api, slugifyFilename } from '../services/api';
+import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import { ArrowLeft, ListChecks, Clock, Eye } from 'lucide-react';
 
@@ -57,21 +57,12 @@ export default function LeaveListDetailPage() {
   const balance = balances?.find((b) => b.personnelId === personnelId);
 
   const downloadDoc = useMutation({
-    mutationFn: (r: { id: string; startDate: string }) => {
-      const date = new Date(r.startDate).toISOString().slice(0, 10);
-      return api.download(`/leave/requests/${r.id}/document`, `izin-onay-belgesi-${date}.pdf`);
-    },
+    mutationFn: (id: string) => api.openProtectedFile(`/leave/requests/${id}/document`),
     onError: (e: any) => toast.error(e.response?.data?.message || 'Belge açılamadı'),
   });
 
   const downloadYearlyReport = useMutation({
-    mutationFn: () => {
-      const nameSlug = person ? slugifyFilename(`${person.firstName} ${person.lastName}`) : personnelId;
-      return api.download(
-        `/leave/balance/${personnelId}/pdf?year=${yr || 'all'}`,
-        `izin-dokumu-${nameSlug}-${yr || 'tum-yillar'}.pdf`,
-      );
-    },
+    mutationFn: () => api.openProtectedFile(`/leave/balance/${personnelId}/pdf?year=${yr || 'all'}`),
     onError: (e: any) => toast.error(e.response?.data?.message || 'İndirilemedi'),
   });
 
@@ -248,7 +239,7 @@ export default function LeaveListDetailPage() {
                   <td className="px-4 py-3">
                     {r.status === 'APPROVED' && (
                       <button
-                        onClick={() => downloadDoc.mutate(r)}
+                        onClick={() => downloadDoc.mutate(r.id)}
                         className="text-brand-600 hover:underline text-xs"
                       >
                         Belge Görüntüle

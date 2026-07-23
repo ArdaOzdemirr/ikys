@@ -81,10 +81,7 @@ export default function LeavePage() {
   });
 
   const downloadDoc = useMutation({
-    mutationFn: (r: { id: string; startDate: string }) => {
-      const date = new Date(r.startDate).toISOString().slice(0, 10);
-      return api.download(`/leave/requests/${r.id}/document`, `izin-onay-belgesi-${date}.pdf`);
-    },
+    mutationFn: (id: string) => api.openProtectedFile(`/leave/requests/${id}/document`),
     onError: (e: any) => toast.error(e.response?.data?.message || 'Belge açılamadı'),
   });
 
@@ -307,7 +304,7 @@ export default function LeavePage() {
                   <div className="flex gap-3 items-center">
                     {r.status === 'APPROVED' && (
                       <button
-                        onClick={() => downloadDoc.mutate(r)}
+                        onClick={() => downloadDoc.mutate(r.id)}
                         className="text-brand-600 hover:underline text-xs"
                       >
                         Belge Görüntüle

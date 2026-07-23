@@ -2,16 +2,6 @@ import axios, { AxiosInstance } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
-/** Dosya adı için güvenli/okunabilir hale getirir (Türkçe karakterleri sadeleştirir). */
-export function slugifyFilename(s: string): string {
-  return s
-    .replace(/ı/g, 'i').replace(/İ/g, 'I').replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
-    .replace(/ü/g, 'u').replace(/Ü/g, 'U').replace(/ş/g, 's').replace(/Ş/g, 'S')
-    .replace(/ö/g, 'o').replace(/Ö/g, 'O').replace(/ç/g, 'c').replace(/Ç/g, 'C')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 class ApiClient {
   private client: AxiosInstance;
   private isRefreshing = false;

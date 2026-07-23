@@ -8,6 +8,14 @@ import SalaryConfigModal from '../components/SalaryConfigModal';
 import DocumentUploadModal from '../components/DocumentUploadModal';
 import PersonnelEditModal from '../components/PersonnelEditModal';
 
+const CONTRACT_TYPE_LABELS: Record<string, string> = {
+  PERMANENT: 'Belirsiz Süreli (Kadrolu)',
+  TEMPORARY: 'Belirli Süreli',
+  PARTTIME: 'Yarı Zamanlı',
+  INTERN: 'Stajyer',
+  CONSULTANT: 'Danışman',
+};
+
 export default function PersonnelDetailPage() {
   const { id } = useParams();
   const { hasRole, canManagePayroll } = useAuth();
@@ -73,7 +81,7 @@ export default function PersonnelDetailPage() {
         <div className="card">
           <h3 className="font-semibold mb-4">İş Bilgileri</h3>
           <Field label="İşe Giriş" value={new Date(p.hireDate).toLocaleDateString('tr-TR')} />
-          <Field label="Sözleşme Tipi" value={p.contractType} />
+          <Field label="Sözleşme Tipi" value={CONTRACT_TYPE_LABELS[p.contractType] || p.contractType} />
           <Field
             label="Yönetici"
             value={p.manager ? `${p.manager.firstName} ${p.manager.lastName}` : '-'}

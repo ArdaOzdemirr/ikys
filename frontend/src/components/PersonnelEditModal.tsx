@@ -11,7 +11,13 @@ interface Props {
   personnel: any;
 }
 
-const CONTRACT_TYPES = ['PERMANENT', 'TEMPORARY', 'PARTTIME', 'INTERN', 'CONSULTANT'];
+const CONTRACT_TYPES: { value: string; label: string }[] = [
+  { value: 'PERMANENT', label: 'Belirsiz Süreli (Kadrolu)' },
+  { value: 'TEMPORARY', label: 'Belirli Süreli' },
+  { value: 'PARTTIME', label: 'Yarı Zamanlı' },
+  { value: 'INTERN', label: 'Stajyer' },
+  { value: 'CONSULTANT', label: 'Danışman' },
+];
 
 export default function PersonnelEditModal({ open, onClose, personnelId, personnel }: Props) {
   const qc = useQueryClient();
@@ -97,7 +103,7 @@ export default function PersonnelEditModal({ open, onClose, personnelId, personn
               onChange={(e) => setForm({ ...form, contractType: e.target.value })}
             >
               {CONTRACT_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
           </div>

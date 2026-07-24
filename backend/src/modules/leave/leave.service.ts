@@ -67,17 +67,21 @@ export class LeaveService {
   private addFooter(doc: PDFKit.PDFDocument) {
     const x = doc.page.margins.left;
     const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    const lineY = doc.page.height - doc.page.margins.bottom + 18;
+    // Toplu tablo gibi dar alt marjinli (25pt) sayfalarda büyük bir ofset,
+    // metni sayfanın fiziksel alt kenarının dışına taşırıp PDFKit'in
+    // otomatik yeni sayfa eklemesine yol açıyordu; ofsetler en dar marjine
+    // göre güvenli kalacak şekilde küçültüldü.
+    const lineY = doc.page.height - doc.page.margins.bottom + 5;
     doc.moveTo(x, lineY).lineTo(x + width, lineY).lineWidth(0.5).strokeColor('#e5e7eb').stroke();
     // Metin, sayfanın alt boşluk (margin) alanına yazılıyor; PDFKit normalde
     // bunu "sayfa taştı" sanıp otomatik yeni bir sayfa ekler. Metni yazarken
     // alt marjini geçici olarak sıfırlayıp bu davranışı engelliyoruz.
     const originalBottomMargin = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;
-    doc.font('DejaVu').fontSize(8).fillColor('#9ca3af').text(
+    doc.font('DejaVu').fontSize(7).fillColor('#9ca3af').text(
       'Bu belge İKYS üzerinden elektronik olarak oluşturulmuştur.',
       x,
-      lineY + 6,
+      lineY + 4,
       { width, align: 'center' },
     );
     doc.page.margins.bottom = originalBottomMargin;

@@ -69,12 +69,18 @@ export class LeaveService {
     const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const lineY = doc.page.height - doc.page.margins.bottom + 18;
     doc.moveTo(x, lineY).lineTo(x + width, lineY).lineWidth(0.5).strokeColor('#e5e7eb').stroke();
+    // Metin, sayfanın alt boşluk (margin) alanına yazılıyor; PDFKit normalde
+    // bunu "sayfa taştı" sanıp otomatik yeni bir sayfa ekler. Metni yazarken
+    // alt marjini geçici olarak sıfırlayıp bu davranışı engelliyoruz.
+    const originalBottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     doc.font('DejaVu').fontSize(8).fillColor('#9ca3af').text(
       'Bu belge İKYS üzerinden elektronik olarak oluşturulmuştur.',
       x,
       lineY + 6,
       { width, align: 'center' },
     );
+    doc.page.margins.bottom = originalBottomMargin;
     doc.fillColor('black').strokeColor('black');
   }
 

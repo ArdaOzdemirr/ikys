@@ -37,6 +37,20 @@ export class LeaveService {
     path.dirname(require.resolve('dejavu-fonts-ttf/package.json')),
     'ttf',
   );
+  private readonly logoPath = path.join(__dirname, '..', '..', 'assets', 'logo.png');
+
+  /** PDF'in sol üst köşesine uygulama logosunu yerleştirir; dosya yoksa (ör.
+   * derlenmemiş test ortamı) sessizce atlanır, belge logosuz üretilmeye devam eder. */
+  private addLogo(doc: PDFKit.PDFDocument) {
+    try {
+      const size = 30;
+      const topGap = 10;
+      doc.image(this.logoPath, doc.page.margins.left, topGap, { width: size });
+      doc.y = Math.max(doc.y, topGap + size + 8);
+    } catch {
+      // yoksay
+    }
+  }
 
   constructor(
     private prisma: PrismaService,
@@ -290,6 +304,7 @@ export class LeaveService {
       doc.registerFont('DejaVu', path.join(this.fontsDir, 'DejaVuSans.ttf'));
       doc.registerFont('DejaVu-Bold', path.join(this.fontsDir, 'DejaVuSans-Bold.ttf'));
       doc.font('DejaVu');
+      this.addLogo(doc);
 
       doc.font('DejaVu-Bold').fontSize(18).text('İZİN ONAY BELGESİ', { align: 'center' });
       doc.moveDown(2);
@@ -1101,6 +1116,7 @@ export class LeaveService {
       doc.registerFont('DejaVu', path.join(this.fontsDir, 'DejaVuSans.ttf'));
       doc.registerFont('DejaVu-Bold', path.join(this.fontsDir, 'DejaVuSans-Bold.ttf'));
       doc.font('DejaVu');
+      this.addLogo(doc);
 
       doc.font('DejaVu-Bold').fontSize(15).text(`${year} YILLIK İZİN TABLOSU`, { align: 'center' });
       doc.font('DejaVu').fontSize(8).fillColor('gray').text(
@@ -1237,6 +1253,7 @@ export class LeaveService {
       doc.registerFont('DejaVu', path.join(this.fontsDir, 'DejaVuSans.ttf'));
       doc.registerFont('DejaVu-Bold', path.join(this.fontsDir, 'DejaVuSans-Bold.ttf'));
       doc.font('DejaVu');
+      this.addLogo(doc);
 
       doc.font('DejaVu-Bold').fontSize(16).text(
         year != null ? `${year} YILLIK İZİN DÖKÜMÜ` : 'TÜM YILLAR İZİN DÖKÜMÜ',

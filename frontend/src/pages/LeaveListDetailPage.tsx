@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, ListChecks, Clock, Eye } from 'lucide-react';
+import { ArrowLeft, ListChecks, Clock, Eye, CalendarPlus } from 'lucide-react';
 
 const TYPE_LABELS: Record<string, string> = {
   ANNUAL: 'Yıllık İzin',
@@ -44,6 +44,8 @@ export default function LeaveListDetailPage() {
   const [month, setMonth] = useState('');
   const [showHourly, setShowHourly] = useState(false);
   const [hourlyForm, setHourlyForm] = useState({ date: '', startTime: '', endTime: '', reason: '' });
+  const [showGrant, setShowGrant] = useState(false);
+  const [grantForm, setGrantForm] = useState({ type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
 
   const { data: rows } = useQuery<any[]>({
     queryKey: ['leave-list', status, yr],
@@ -73,6 +75,18 @@ export default function LeaveListDetailPage() {
       qc.invalidateQueries({ queryKey: ['leave-list'] });
       setShowHourly(false);
       setHourlyForm({ date: '', startTime: '', endTime: '', reason: '' });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Tanımlanamadı'),
+  });
+
+  const grantLeave = useMutation({
+    mutationFn: () => api.post('/leave/requests/admin-grant', { personnelId, ...grantForm }),
+    onSuccess: () => {
+      toast.success('İzin tanımlandı');
+      qc.invalidateQueries({ queryKey: ['leave-list'] });
+      qc.invalidateQueries({ queryKey: ['leave-balances-all'] });
+      setShowGrant(false);
+      setGrantForm({ type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Tanımlanamadı'),
   });
@@ -108,6 +122,9 @@ export default function LeaveListDetailPage() {
           </button>
           <button onClick={() => setShowHourly(!showHourly)} className="btn-secondary flex items-center gap-2 text-sm">
             <Clock size={16} /> Saatlik İzin Ver
+          </button>
+          <button onClick={() => setShowGrant(!showGrant)} className="btn-secondary flex items-center gap-2 text-sm">
+            <CalendarPlus size={16} /> İzin Ekle
           </button>
         </div>
       </div>
@@ -171,6 +188,55 @@ export default function LeaveListDetailPage() {
               {grantHourly.isPending ? 'Kaydediliyor...' : 'Kaydet'}
             </button>
             <button type="button" onClick={() => setShowHourly(false)} className="btn-secondary">İptal</button>
+          </div>
+        </form>
+      )}
+
+      {showGrant && (
+        <form
+          onSubmit={(e) => { e.preventDefault(); grantLeave.mutate(); }}
+          className="card space-y-3"
+        >
+          <h3 className="font-semibold">İzin Ekle</h3>
+          <p className="text-xs text-gray-500">
+            Bu izin onay süreci gerektirmeden doğrudan onaylı olarak kaydedilir; geçmiş tarihler de seçilebilir.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <select
+              className="input"
+              value={grantForm.type}
+              onChange={(e) => setGrantForm({ ...grantForm, type: e.target.value })}
+            >
+              {Object.entries(TYPE_LABELS).filter(([v]) => v !== 'HOURLY' && v !== 'HALF_DAY').map(([v, label]) => (
+                <option key={v} value={v}>{label}</option>
+              ))}
+            </select>
+            <input
+              type="date"
+              required
+              value={grantForm.startDate}
+              onChange={(e) => setGrantForm({ ...grantForm, startDate: e.target.value })}
+              className="input"
+            />
+            <input
+              type="date"
+              required
+              value={grantForm.endDate}
+              onChange={(e) => setGrantForm({ ...grantForm, endDate: e.target.value })}
+              className="input"
+            />
+            <input
+              placeholder="Açıklama (opsiyonel)"
+              value={grantForm.reason}
+              onChange={(e) => setGrantForm({ ...grantForm, reason: e.target.value })}
+              className="input md:col-span-3"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" disabled={grantLeave.isPending} className="btn-primary disabled:opacity-50">
+              {grantLeave.isPending ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+            <button type="button" onClick={() => setShowGrant(false)} className="btn-secondary">İptal</button>
           </div>
         </form>
       )}

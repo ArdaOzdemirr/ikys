@@ -17,6 +17,19 @@ const _months = [
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
 ];
 
+// Saatlik ve Yarım Gün ayrı akışlarda (kendi ekstra alanları var) verildiği
+// için bu genel "İzin Ekle" formunda listelenmiyor.
+const _grantTypeLabels = {
+  'ANNUAL': 'Yıllık İzin',
+  'EXCUSE': 'Mazeret',
+  'SICK': 'Sağlık Raporu',
+  'MATERNITY': 'Doğum İzni',
+  'PATERNITY': 'Babalık İzni',
+  'MARRIAGE': 'Evlilik İzni',
+  'BEREAVEMENT': 'Vefat İzni',
+  'UNPAID': 'Ücretsiz İzin',
+};
+
 /// İK/Muhasebe/Admin/Yönetici: tek bir personelin tüm izin geçmişi.
 class LeaveListDetailScreen extends StatefulWidget {
   final LeavePersonnelRow personnel;
@@ -40,6 +53,13 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
   TimeOfDay? _hourlyStart;
   TimeOfDay? _hourlyEnd;
   final _hourlyReason = TextEditingController();
+
+  bool _showGrantForm = false;
+  bool _granting = false;
+  String _grantType = 'ANNUAL';
+  DateTime? _grantStart;
+  DateTime? _grantEnd;
+  final _grantReason = TextEditingController();
 
   @override
   void initState() {
@@ -153,6 +173,59 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
     }
   }
 
+  Future<void> _pickGrantDate(bool isStart) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: (isStart ? _grantStart : _grantEnd) ?? now,
+      // Geçmişe dönük izin girilebilsin diye alt sınır uzak bir tarih.
+      firstDate: DateTime(now.year - 5),
+      lastDate: now.add(const Duration(days: 365)),
+      locale: const Locale('tr', 'TR'),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _grantStart = picked;
+        } else {
+          _grantEnd = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _submitGrant() async {
+    if (_grantStart == null || _grantEnd == null) return;
+    setState(() => _granting = true);
+    try {
+      await LeaveService.adminGrant(
+        personnelId: widget.personnel.id,
+        type: _grantType,
+        startDate: DateFormat('yyyy-MM-dd').format(_grantStart!),
+        endDate: DateFormat('yyyy-MM-dd').format(_grantEnd!),
+        reason: _grantReason.text.trim(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('İzin tanımlandı')));
+        setState(() {
+          _showGrantForm = false;
+          _grantStart = null;
+          _grantEnd = null;
+          _grantReason.clear();
+        });
+        _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(ApiClient.errorMessage(e, 'Tanımlanamadı'))));
+      }
+    } finally {
+      if (mounted) setState(() => _granting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -172,6 +245,11 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
             icon: Icon(_showHourlyForm ? Icons.close : Icons.access_time),
             tooltip: 'Saatlik İzin Ver',
             onPressed: () => setState(() => _showHourlyForm = !_showHourlyForm),
+          ),
+          IconButton(
+            icon: Icon(_showGrantForm ? Icons.close : Icons.event_available_outlined),
+            tooltip: 'İzin Ekle',
+            onPressed: () => setState(() => _showGrantForm = !_showGrantForm),
           ),
         ],
       ),
@@ -250,6 +328,81 @@ class _LeaveListDetailScreenState extends State<LeaveListDetailScreen> {
                           ? null
                           : _submitHourly,
                       child: _grantingHourly
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Kaydet'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (_showGrantForm)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('İzin Ekle', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2, bottom: 8),
+                    child: Text(
+                      'Bu izin onay süreci gerektirmeden doğrudan onaylı olarak kaydedilir; geçmiş tarihler de seçilebilir.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: _grantType,
+                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                    items: _grantTypeLabels.entries
+                        .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _grantType = v);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => _pickGrantDate(true),
+                        child: Text(_grantStart == null
+                            ? 'Başlangıç Tarihi'
+                            : DateFormat('dd.MM.yyyy').format(_grantStart!)),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => _pickGrantDate(false),
+                        child: Text(_grantEnd == null
+                            ? 'Bitiş Tarihi'
+                            : DateFormat('dd.MM.yyyy').format(_grantEnd!)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _grantReason,
+                    decoration: const InputDecoration(
+                      hintText: 'Açıklama (opsiyonel)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: (_granting || _grantStart == null || _grantEnd == null)
+                          ? null
+                          : _submitGrant,
+                      child: _granting
                           ? const SizedBox(
                               width: 18, height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))

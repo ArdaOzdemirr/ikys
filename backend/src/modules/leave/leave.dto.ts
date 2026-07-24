@@ -66,6 +66,13 @@ export class CreateHourlyLeaveDto {
   reason?: string;
 }
 
+/** İK/Admin'in bir çalışana geçmişe (veya herhangi bir tarihe) dönük, doğrudan onaylı izin tanımlaması için. */
+export class AdminGrantLeaveDto extends CreateLeaveRequestDto {
+  @ApiProperty({ description: 'İzin tanımlanacak personelin id\'si' })
+  @IsString()
+  personnelId!: string;
+}
+
 export class ApproveLeaveDto {
   @ApiProperty()
   @IsBoolean()

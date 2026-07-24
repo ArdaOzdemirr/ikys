@@ -2,7 +2,7 @@ import { Body, Controller, Delete, ForbiddenException, Get, NotFoundException, P
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { LeaveService } from './leave.service';
-import { ApproveLeaveDto, CreateLeaveRequestDto, CreateHourlyLeaveDto } from './leave.dto';
+import { ApproveLeaveDto, CreateLeaveRequestDto, CreateHourlyLeaveDto, AdminGrantLeaveDto } from './leave.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
@@ -72,6 +72,15 @@ export class LeaveController {
     const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
     if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
     return this.service.hrGrantHourlyLeave(personnel.id, dto);
+  }
+
+  @Post('requests/admin-grant')
+  @Roles(Role.HR, Role.ADMIN)
+  @ApiOperation({ summary: 'İK/Admin: bir personele geçmişe (veya herhangi bir tarihe) dönük, onay gerektirmeden doğrudan onaylı izin tanımla' })
+  async adminGrant(@CurrentUser('userId') userId: string, @Body() dto: AdminGrantLeaveDto) {
+    const personnel = await this.prisma.personnel.findUnique({ where: { userId } });
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+    return this.service.adminGrantLeave(personnel.id, dto);
   }
 
   @Get('requests/:id/document')

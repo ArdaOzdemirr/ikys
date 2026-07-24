@@ -134,6 +134,24 @@ class LeaveService {
     });
   }
 
+  /// İK/Admin: geçmişe (veya herhangi bir tarihe) dönük, onay gerektirmeden
+  /// doğrudan onaylı izin tanımlar.
+  static Future<void> adminGrant({
+    required String personnelId,
+    required String type,
+    required String startDate,
+    required String endDate,
+    String? reason,
+  }) async {
+    await ApiClient.instance.dio.post('/leave/requests/admin-grant', data: {
+      'personnelId': personnelId,
+      'type': type,
+      'startDate': startDate,
+      'endDate': endDate,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    });
+  }
+
   /// Yalnızca henüz onaylanmamış (PENDING) kendi talebini geri çeker.
   static Future<void> cancel(String id) async {
     await ApiClient.instance.dio.delete('/leave/requests/$id');

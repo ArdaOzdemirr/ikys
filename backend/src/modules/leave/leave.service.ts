@@ -17,7 +17,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
-import { CreateLeaveRequestDto, ApproveLeaveDto, CreateHourlyLeaveDto } from './leave.dto';
+import { CreateLeaveRequestDto, ApproveLeaveDto, CreateHourlyLeaveDto, AdminGrantLeaveDto } from './leave.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { cumulativeAnnualLeaveEntitlement } from './leave-entitlement.util';
 import { getHistoricalOverride } from './leave-historical-overrides.util';
@@ -282,6 +282,112 @@ export class LeaveService {
       body:
         `${dayjs(date).format('DD.MM.YYYY')} tarihinde ${dto.startTime}-${dto.endTime} ` +
         `arası saatlik izniniz İK tarafından tanımlandı.`,
+      refType: 'LeaveRequest',
+      refId: request.id,
+    });
+
+    return request;
+  }
+
+  /**
+   * İK/Admin, bir çalışana geçmişe (veya herhangi bir tarihe) dönük izin
+   * doğrudan tanımlar: onay zinciri yok, talep zaten APPROVED olarak
+   * oluşur. Yıllık izin bakiyesini etkileyen türlerde, iznin başladığı
+   * yılın bakiyesinden hemen düşülür (hrGrantHourlyLeave'in aksine,
+   * bakiyeyi etkileyen türlerde bakiyeye dokunulur).
+   */
+  async adminGrantLeave(adminPersonnelId: string, dto: AdminGrantLeaveDto) {
+    const personnel = await this.prisma.personnel.findUnique({
+      where: { id: dto.personnelId },
+    });
+    if (!personnel) throw new NotFoundException('Personel kaydı bulunamadı');
+
+    const start = new Date(dto.startDate);
+    const end = new Date(dto.endDate);
+    if (end < start) {
+      throw new BadRequestException('Bitiş tarihi başlangıçtan önce olamaz');
+    }
+
+    const isHalfDay = dto.type === LeaveType.HALF_DAY;
+    if (isHalfDay) {
+      if (start.getTime() !== end.getTime()) {
+        throw new BadRequestException('Yarım gün izin sadece tek bir gün için alınabilir');
+      }
+      if (dto.halfDayPeriod !== 'AM' && dto.halfDayPeriod !== 'PM') {
+        throw new BadRequestException('Yarım gün için seans (öğleden önce/sonra) seçilmeli');
+      }
+    }
+
+    const businessDays = await this.calculateBusinessDays(start, end);
+    if (businessDays <= 0) {
+      throw new BadRequestException('Seçilen aralıkta iş günü yok');
+    }
+    const totalDays = isHalfDay ? 0.5 : businessDays;
+
+    const overlap = await this.prisma.leaveRequest.findFirst({
+      where: {
+        personnelId: dto.personnelId,
+        status: { in: [LeaveStatus.PENDING, LeaveStatus.APPROVED] },
+        AND: [{ startDate: { lte: end } }, { endDate: { gte: start } }],
+      },
+    });
+    if (overlap) {
+      throw new BadRequestException('Bu tarihlerde personelin mevcut bir izin kaydı var');
+    }
+
+    const cat = await this.resolveCategory(dto);
+    const startYear = start.getFullYear();
+
+    const request = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.leaveRequest.create({
+        data: {
+          personnelId: dto.personnelId,
+          type: cat.enumType ?? null,
+          categoryId: cat.id ?? null,
+          startDate: start,
+          endDate: end,
+          totalDays,
+          reason: dto.reason,
+          halfDayPeriod: isHalfDay ? dto.halfDayPeriod : null,
+          status: LeaveStatus.APPROVED,
+          approverId: adminPersonnelId,
+          approvedAt: new Date(),
+          currentStepOrder: 1,
+          deductFromYear: cat.affectsAnnualBalance ? startYear : null,
+        },
+      });
+
+      if (cat.affectsAnnualBalance) {
+        await tx.leaveBalance.upsert({
+          where: {
+            personnelId_year_type: { personnelId: dto.personnelId, year: startYear, type: LeaveType.ANNUAL },
+          },
+          update: {
+            usedDays: { increment: totalDays },
+            remainingDays: { decrement: totalDays },
+          },
+          create: {
+            personnelId: dto.personnelId,
+            year: startYear,
+            type: LeaveType.ANNUAL,
+            totalDays: 0,
+            usedDays: totalDays,
+            remainingDays: -totalDays,
+          },
+        });
+      }
+
+      return created;
+    });
+
+    await this.notifications.create({
+      recipientId: dto.personnelId,
+      senderId: adminPersonnelId,
+      type: NotificationType.LEAVE_APPROVED,
+      title: 'İzniniz tanımlandı',
+      body:
+        `${dayjs(start).format('DD.MM.YYYY')} - ${dayjs(end).format('DD.MM.YYYY')} arası ` +
+        `${totalDays} günlük izniniz İK/Admin tarafından tanımlandı.`,
       refType: 'LeaveRequest',
       refId: request.id,
     });

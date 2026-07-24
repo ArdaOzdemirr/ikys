@@ -341,7 +341,7 @@ export class LeaveService {
       doc.font('DejaVu-Bold').fontSize(20).text('İZİN ONAY BELGESİ', { align: 'center' });
       doc.moveDown(0.5);
       this.addAccentRule(doc);
-      doc.moveDown(1.5);
+      doc.moveDown(1.2);
 
       const dayText =
         req.totalDays === 1 ? '1 günlük' : `${req.totalDays.toString().replace('.', ',')} günlük`;
@@ -354,38 +354,77 @@ export class LeaveService {
               ? ` (${req.startTime}-${req.endTime})`
               : '';
 
+      // "ONAYLANDI" rozeti — sayfa ortasında, marka renginde yuvarlak bir etiket.
+      const pillText = 'ONAYLANDI';
+      doc.font('DejaVu-Bold').fontSize(10);
+      const pillPadX = 14;
+      const pillPadY = 7;
+      const pillWidth = doc.widthOfString(pillText) + pillPadX * 2;
+      const pillHeight = 24;
+      const pillX = (doc.page.width - pillWidth) / 2;
+      const pillY = doc.y;
+      doc.roundedRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2).fillColor(this.brandColor).fill();
+      doc.fillColor('white').text(pillText, pillX, pillY + pillPadY - 1, { width: pillWidth, align: 'center' });
+      doc.fillColor('black');
+      doc.y = pillY + pillHeight;
+      doc.moveDown(1.5);
+
+      // Anlatım metni: koyu renk vurgulu ("continued" text) tümceler, sol
+      // kenarında marka renginde ince bir şerit olan yumuşak bir kart içinde.
       const boxX = doc.page.margins.left;
       const boxWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-      const rows: [string, string][] = [
-        ['Personel', employeeName],
-        ['Sicil No', req.personnel.employeeNo],
-        ['İzin Türü', `${typeName}${periodText}`],
-        ['Tarih Aralığı', `${fmt(req.startDate)} - ${fmt(req.endDate)}  (${dayText})`],
-        ['Onaylayan', approverName],
-        ['Onay Tarihi', fmt(req.approvedAt ?? req.updatedAt)],
+      const padding = 20;
+      const segments: { text: string; bold?: boolean; color?: string }[] = [
+        { text: employeeName, bold: true },
+        { text: ', İKYS uygulaması üzerinden ' },
+        { text: `${fmt(req.startDate)} - ${fmt(req.endDate)}`, bold: true, color: this.brandColor },
+        { text: ' tarihleri arasında ' },
+        { text: `${typeName}${periodText}`, bold: true, color: this.brandColor },
+        { text: ' kapsamında ' },
+        { text: dayText, bold: true, color: this.brandColor },
+        { text: ' izin talebinde bulunmuştur. ' },
+        { text: approverName, bold: true },
+        { text: ' tarafından onaylanmıştır.' },
       ];
-      const rowHeight = 28;
+      const plainText = segments.map((s) => s.text).join('');
+      doc.font('DejaVu').fontSize(12);
+      const textHeight = doc.heightOfString(plainText, { width: boxWidth - padding * 2 - 4, lineGap: 5 });
       const boxY = doc.y;
-      doc.rect(boxX, boxY, boxWidth, rowHeight * rows.length)
-        .strokeColor('#d1d5db').lineWidth(1).stroke();
-      rows.forEach(([label, value], i) => {
-        const ry = boxY + i * rowHeight;
-        if (i > 0) {
-          doc.moveTo(boxX, ry).lineTo(boxX + boxWidth, ry).strokeColor('#e5e7eb').stroke();
+      const boxHeight = textHeight + padding * 2;
+
+      doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 8).fillColor(this.brandTint).fill();
+      doc.rect(boxX, boxY, 4, boxHeight).fillColor(this.brandColor).fill();
+
+      segments.forEach((seg, i) => {
+        doc.font(seg.bold ? 'DejaVu-Bold' : 'DejaVu').fontSize(12).fillColor(seg.color ?? '#111827');
+        if (i === 0) {
+          doc.text(seg.text, boxX + padding + 4, boxY + padding, {
+            continued: true,
+            width: boxWidth - padding * 2 - 4,
+            lineGap: 5,
+          });
+        } else {
+          doc.text(seg.text, { continued: i < segments.length - 1 });
         }
-        doc.font('DejaVu-Bold').fontSize(9).fillColor('#6b7280')
-          .text(label.toLocaleUpperCase('tr-TR'), boxX + 14, ry + 9, { width: 140 });
-        doc.font('DejaVu').fontSize(11).fillColor('#111827')
-          .text(value, boxX + 160, ry + 8, { width: boxWidth - 174 });
       });
       doc.fillColor('black').strokeColor('black');
-      doc.y = boxY + rowHeight * rows.length + 24;
+      doc.y = boxY + boxHeight + 32;
 
-      doc.font('DejaVu').fontSize(11).text(
-        'Bu belge, yukarıda belirtilen izin talebinin onaylandığını gösterir.',
-        { align: 'left', lineGap: 4 },
-      );
+      // İmza benzeri kapanış: onaylayan adı ve onay tarihi, üstlerinde ince
+      // bir çizgiyle imza satırı gibi ayrılmış iki sütun.
+      const sigColWidth = boxWidth / 2 - 16;
+      const sigY = doc.y;
+      doc.moveTo(boxX, sigY).lineTo(boxX + sigColWidth, sigY).strokeColor('#d1d5db').lineWidth(1).stroke();
+      doc.font('DejaVu-Bold').fontSize(11).fillColor('#111827').text(approverName, boxX, sigY + 8);
+      doc.font('DejaVu').fontSize(8).fillColor('#9ca3af').text('ONAYLAYAN', boxX, sigY + 24);
 
+      const sigX2 = boxX + boxWidth - sigColWidth;
+      doc.moveTo(sigX2, sigY).lineTo(sigX2 + sigColWidth, sigY).strokeColor('#d1d5db').lineWidth(1).stroke();
+      doc.font('DejaVu-Bold').fontSize(11).fillColor('#111827')
+        .text(fmt(req.approvedAt ?? req.updatedAt), sigX2, sigY + 8);
+      doc.font('DejaVu').fontSize(8).fillColor('#9ca3af').text('ONAY TARİHİ', sigX2, sigY + 24);
+
+      doc.fillColor('black').strokeColor('black');
       this.addFooter(doc);
       doc.end();
     });

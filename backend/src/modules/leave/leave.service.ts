@@ -38,18 +38,44 @@ export class LeaveService {
     'ttf',
   );
   private readonly logoPath = path.join(__dirname, '..', '..', 'assets', 'logo.png');
+  private readonly brandColor = '#1e3a8a';
+  private readonly brandTint = '#eef2ff';
 
-  /** PDF'in sol üst köşesine uygulama logosunu yerleştirir; dosya yoksa (ör.
+  /** PDF'in sağ üst köşesine uygulama logosunu yerleştirir; dosya yoksa (ör.
    * derlenmemiş test ortamı) sessizce atlanır, belge logosuz üretilmeye devam eder. */
   private addLogo(doc: PDFKit.PDFDocument) {
     try {
-      const size = 30;
+      const width = 70;
       const topGap = 10;
-      doc.image(this.logoPath, doc.page.margins.left, topGap, { width: size });
-      doc.y = Math.max(doc.y, topGap + size + 8);
+      const x = doc.page.width - doc.page.margins.right - width;
+      doc.image(this.logoPath, x, topGap, { width });
+      doc.y = Math.max(doc.y, topGap + width + 8); // logo karesel (1024x1024)
     } catch {
       // yoksay
     }
+  }
+
+  /** Başlığın altına marka renginde ince bir ayraç çizgisi çizer. */
+  private addAccentRule(doc: PDFKit.PDFDocument) {
+    const x = doc.page.margins.left;
+    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    doc.moveTo(x, doc.y).lineTo(x + width, doc.y).lineWidth(2).strokeColor(this.brandColor).stroke();
+    doc.strokeColor('black').lineWidth(1);
+  }
+
+  /** Sayfanın altına ince bir çizgi + belge künyesi ekler. */
+  private addFooter(doc: PDFKit.PDFDocument) {
+    const x = doc.page.margins.left;
+    const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const lineY = doc.page.height - doc.page.margins.bottom + 18;
+    doc.moveTo(x, lineY).lineTo(x + width, lineY).lineWidth(0.5).strokeColor('#e5e7eb').stroke();
+    doc.font('DejaVu').fontSize(8).fillColor('#9ca3af').text(
+      'Bu belge İKYS üzerinden elektronik olarak oluşturulmuştur.',
+      x,
+      lineY + 6,
+      { width, align: 'center' },
+    );
+    doc.fillColor('black').strokeColor('black');
   }
 
   constructor(
@@ -306,8 +332,10 @@ export class LeaveService {
       doc.font('DejaVu');
       this.addLogo(doc);
 
-      doc.font('DejaVu-Bold').fontSize(18).text('İZİN ONAY BELGESİ', { align: 'center' });
-      doc.moveDown(2);
+      doc.font('DejaVu-Bold').fontSize(20).text('İZİN ONAY BELGESİ', { align: 'center' });
+      doc.moveDown(0.5);
+      this.addAccentRule(doc);
+      doc.moveDown(1.5);
 
       const dayText =
         req.totalDays === 1 ? '1 günlük' : `${req.totalDays.toString().replace('.', ',')} günlük`;
@@ -320,25 +348,39 @@ export class LeaveService {
               ? ` (${req.startTime}-${req.endTime})`
               : '';
 
-      doc.font('DejaVu').fontSize(12).text(
-        `${employeeName}, İKYS uygulaması üzerinden ${fmt(req.startDate)} - ${fmt(req.endDate)} ` +
-          `tarihleri arasında ${typeName} kapsamında ${dayText}${periodText} izin talebinde bulunmuştur. ` +
-          `${approverName} tarafından onaylanmıştır.`,
+      const boxX = doc.page.margins.left;
+      const boxWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const rows: [string, string][] = [
+        ['Personel', employeeName],
+        ['Sicil No', req.personnel.employeeNo],
+        ['İzin Türü', `${typeName}${periodText}`],
+        ['Tarih Aralığı', `${fmt(req.startDate)} - ${fmt(req.endDate)}  (${dayText})`],
+        ['Onaylayan', approverName],
+        ['Onay Tarihi', fmt(req.approvedAt ?? req.updatedAt)],
+      ];
+      const rowHeight = 28;
+      const boxY = doc.y;
+      doc.rect(boxX, boxY, boxWidth, rowHeight * rows.length)
+        .strokeColor('#d1d5db').lineWidth(1).stroke();
+      rows.forEach(([label, value], i) => {
+        const ry = boxY + i * rowHeight;
+        if (i > 0) {
+          doc.moveTo(boxX, ry).lineTo(boxX + boxWidth, ry).strokeColor('#e5e7eb').stroke();
+        }
+        doc.font('DejaVu-Bold').fontSize(9).fillColor('#6b7280')
+          .text(label.toLocaleUpperCase('tr-TR'), boxX + 14, ry + 9, { width: 140 });
+        doc.font('DejaVu').fontSize(11).fillColor('#111827')
+          .text(value, boxX + 160, ry + 8, { width: boxWidth - 174 });
+      });
+      doc.fillColor('black').strokeColor('black');
+      doc.y = boxY + rowHeight * rows.length + 24;
+
+      doc.font('DejaVu').fontSize(11).text(
+        'Bu belge, yukarıda belirtilen izin talebinin onaylandığını gösterir.',
         { align: 'left', lineGap: 4 },
       );
-      doc.moveDown(2);
 
-      doc.text(`Tarih: ${fmt(req.approvedAt ?? req.updatedAt)}`);
-      doc.moveDown(3);
-
-      const colWidth = (doc.page.width - 100) / 2;
-      const y = doc.y;
-      doc.font('DejaVu-Bold').text('İşçi', 50, y);
-      doc.font('DejaVu').text(employeeName, 50, y + 18);
-
-      doc.font('DejaVu-Bold').text('Onaylayan', 50 + colWidth, y);
-      doc.font('DejaVu').text(approverName, 50 + colWidth, y + 18);
-
+      this.addFooter(doc);
       doc.end();
     });
   }
@@ -1124,6 +1166,8 @@ export class LeaveService {
         { align: 'center' },
       );
       doc.fillColor('black');
+      doc.moveDown(0.5);
+      this.addAccentRule(doc);
       doc.moveDown(1);
 
       const cols: { label: string; width: number }[] = [
@@ -1145,9 +1189,12 @@ export class LeaveService {
       // Tek bir satırı, hücreleri çizgiyle ayrılmış gerçek bir tablo satırı
       // gibi çizer (dış çerçeve + sütun ayraçları).
       const drawGridRow = (values: string[], bold: boolean, height = rowHeight) => {
+        if (bold) {
+          doc.rect(startX, y, tableWidth, height).fillColor(this.brandTint).fill();
+        }
         doc.rect(startX, y, tableWidth, height).strokeColor('#cccccc').stroke();
         let x = startX;
-        doc.font(bold ? 'DejaVu-Bold' : 'DejaVu').fontSize(7.5);
+        doc.font(bold ? 'DejaVu-Bold' : 'DejaVu').fontSize(7.5).fillColor(bold ? this.brandColor : 'black');
         for (let i = 0; i < cols.length; i++) {
           if (i > 0) {
             doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#cccccc').stroke();
@@ -1155,6 +1202,7 @@ export class LeaveService {
           doc.text(values[i], x + 3, y + 4, { width: cols[i].width - 6 });
           x += cols[i].width;
         }
+        doc.fillColor('black');
         y += height;
       };
 
@@ -1183,6 +1231,7 @@ export class LeaveService {
         drawGridRow(values, false);
       }
 
+      this.addFooter(doc);
       doc.end();
     });
   }
@@ -1259,6 +1308,8 @@ export class LeaveService {
         year != null ? `${year} YILLIK İZİN DÖKÜMÜ` : 'TÜM YILLAR İZİN DÖKÜMÜ',
         { align: 'center' },
       );
+      doc.moveDown(0.5);
+      this.addAccentRule(doc);
       doc.moveDown(1);
 
       doc.font('DejaVu-Bold').fontSize(12).text(`${p.firstName} ${p.lastName}`);
@@ -1268,15 +1319,21 @@ export class LeaveService {
       doc.text(`İşe Giriş: ${dayjs(p.hireDate).format('DD.MM.YYYY')}`);
       doc.moveDown(1);
 
-      const cardWidth = (doc.page.width - 100) / cards.length;
+      const cardGap = 8;
+      const cardWidth = (doc.page.width - 100 - cardGap * (cards.length - 1)) / cards.length;
+      const cardHeight = 44;
       const cardY = doc.y;
       cards.forEach(([label, value], i) => {
-        const x = 50 + i * cardWidth;
-        doc.font('DejaVu-Bold').fontSize(9).text(value, x, cardY, { width: cardWidth - 5 });
-        doc.font('DejaVu').fontSize(8).fillColor('gray').text(label, x, cardY + 14, { width: cardWidth - 5 });
+        const x = 50 + i * (cardWidth + cardGap);
+        doc.rect(x, cardY, cardWidth, cardHeight).fillColor(this.brandTint).fill();
+        doc.rect(x, cardY, cardWidth, cardHeight).strokeColor('#dbe2fb').lineWidth(1).stroke();
+        doc.font('DejaVu-Bold').fontSize(11).fillColor(this.brandColor)
+          .text(value, x + 8, cardY + 10, { width: cardWidth - 16 });
+        doc.font('DejaVu').fontSize(8).fillColor('#6b7280')
+          .text(label, x + 8, cardY + 27, { width: cardWidth - 16 });
         doc.fillColor('black');
       });
-      doc.y = cardY + 40;
+      doc.y = cardY + cardHeight + 12;
       doc.moveDown(1);
 
       doc.font('DejaVu-Bold').fontSize(11).text('İZİN GEÇMİŞİ');
@@ -1333,6 +1390,7 @@ export class LeaveService {
         doc.moveDown(0.6);
       }
 
+      this.addFooter(doc);
       doc.end();
     });
   }

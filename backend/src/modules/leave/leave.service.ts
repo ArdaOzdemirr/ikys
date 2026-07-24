@@ -338,10 +338,10 @@ export class LeaveService {
       doc.font('DejaVu');
       this.addLogo(doc);
 
-      doc.font('DejaVu-Bold').fontSize(20).text('İZİN ONAY BELGESİ', { align: 'center' });
+      doc.font('DejaVu-Bold').fontSize(18).text('İZİN ONAY BELGESİ', { align: 'center' });
       doc.moveDown(0.5);
       this.addAccentRule(doc);
-      doc.moveDown(1.2);
+      doc.moveDown(2);
 
       const dayText =
         req.totalDays === 1 ? '1 günlük' : `${req.totalDays.toString().replace('.', ',')} günlük`;
@@ -354,61 +354,32 @@ export class LeaveService {
               ? ` (${req.startTime}-${req.endTime})`
               : '';
 
-      // "ONAYLANDI" rozeti — sayfa ortasında, marka renginde yuvarlak bir etiket.
-      const pillText = 'ONAYLANDI';
-      doc.font('DejaVu-Bold').fontSize(10);
-      const pillPadX = 14;
-      const pillPadY = 7;
-      const pillWidth = doc.widthOfString(pillText) + pillPadX * 2;
-      const pillHeight = 24;
-      const pillX = (doc.page.width - pillWidth) / 2;
-      const pillY = doc.y;
-      doc.roundedRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2).fillColor(this.brandColor).fill();
-      doc.fillColor('white').text(pillText, pillX, pillY + pillPadY - 1, { width: pillWidth, align: 'center' });
-      doc.fillColor('black');
-      doc.y = pillY + pillHeight;
-      doc.moveDown(1.5);
-
-      // Anlatım metni: koyu renk vurgulu ("continued" text) tümceler, sol
-      // kenarında marka renginde ince bir şerit olan yumuşak bir kart içinde.
+      // Sade, resmi anlatım metni: sadece kişi adları kalın, renk/kart yok.
       const boxX = doc.page.margins.left;
       const boxWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-      const padding = 20;
-      const segments: { text: string; bold?: boolean; color?: string }[] = [
+      const segments: { text: string; bold?: boolean }[] = [
         { text: employeeName, bold: true },
         { text: ', İKYS uygulaması üzerinden ' },
-        { text: `${fmt(req.startDate)} - ${fmt(req.endDate)}`, bold: true, color: this.brandColor },
+        { text: `${fmt(req.startDate)} - ${fmt(req.endDate)}` },
         { text: ' tarihleri arasında ' },
-        { text: `${typeName}${periodText}`, bold: true, color: this.brandColor },
+        { text: `${typeName}${periodText}` },
         { text: ' kapsamında ' },
-        { text: dayText, bold: true, color: this.brandColor },
+        { text: dayText },
         { text: ' izin talebinde bulunmuştur. ' },
         { text: approverName, bold: true },
         { text: ' tarafından onaylanmıştır.' },
       ];
-      const plainText = segments.map((s) => s.text).join('');
-      doc.font('DejaVu').fontSize(12);
-      const textHeight = doc.heightOfString(plainText, { width: boxWidth - padding * 2 - 4, lineGap: 5 });
-      const boxY = doc.y;
-      const boxHeight = textHeight + padding * 2;
-
-      doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 8).fillColor(this.brandTint).fill();
-      doc.rect(boxX, boxY, 4, boxHeight).fillColor(this.brandColor).fill();
-
+      const startY = doc.y;
       segments.forEach((seg, i) => {
-        doc.font(seg.bold ? 'DejaVu-Bold' : 'DejaVu').fontSize(12).fillColor(seg.color ?? '#111827');
+        doc.font(seg.bold ? 'DejaVu-Bold' : 'DejaVu').fontSize(12).fillColor('#111827');
         if (i === 0) {
-          doc.text(seg.text, boxX + padding + 4, boxY + padding, {
-            continued: true,
-            width: boxWidth - padding * 2 - 4,
-            lineGap: 5,
-          });
+          doc.text(seg.text, boxX, startY, { continued: true, width: boxWidth, lineGap: 5 });
         } else {
           doc.text(seg.text, { continued: i < segments.length - 1 });
         }
       });
       doc.fillColor('black').strokeColor('black');
-      doc.y = boxY + boxHeight + 32;
+      doc.moveDown(3);
 
       // İmza benzeri kapanış: onaylayan adı ve onay tarihi, üstlerinde ince
       // bir çizgiyle imza satırı gibi ayrılmış iki sütun.
